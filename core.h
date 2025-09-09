@@ -158,7 +158,7 @@ void * core_arena_alloc(core_Arena * a, const size_t bytes) _CORE_FN_BODY({
     if(a->head == NULL) {
         core_Allocation * head =  core_arena_allocation_new(bytes);       
         a->head = head;
-        return a->head->next;
+        return a->head->mem;
     }
     core_Allocation * ptr = a->head;
     for(;ptr->next != NULL; ptr = ptr->next) {
