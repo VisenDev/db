@@ -1,7 +1,7 @@
-#include "./sqlite/sqlite3.h"
-
+#include "./3rdparty/raylib/raylib.h"
+#include "./3rdparty/sqlite/sqlite3.h"
 #define CORE_IMPLEMENTATION
-#include "core.h"
+#include "./3rdparty/core.h/core.h"
 
 char * read_whole_file(core_Arena * a, const char * filepath) {
     FILE * fp = fopen(filepath, "r");
@@ -32,4 +32,13 @@ void create_new_db(const char * filepath) {
 
 int main() {
     create_new_db("main.db");
+    InitWindow(1000, 1000, "hello");
+
+    while(!WindowShouldClose()) {
+        BeginDrawing();
+        ClearBackground(RAYWHITE);
+        EndDrawing();
+    }
+
+    CloseWindow();
 }
