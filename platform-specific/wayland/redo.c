@@ -9,6 +9,7 @@
 #include <sys/mman.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <poll.h>
 
 //// WAYLAND SPECIFIC LIBRARIES
 #include <wayland-client.h>
@@ -35,6 +36,9 @@ typedef struct xdg_toplevel * XdgToplevel;
 
 typedef struct {
     int fd;
+    int32_t width;
+    int32_t stride;
+    int32_t height;
     size_t size;
     Pool pool;
     uint32_t * pixels;
@@ -57,11 +61,12 @@ typedef struct {
     XdgToplevel xdg_toplevel;
 
     /*Frame Buffers*/
-    FrameBuffer front;
-    FrameBuffer back;
+    FrameBuffer front_buffer;
+    FrameBuffer back_buffer;
 
     /*Application State*/
     bool quit;
+    bool next_frame;
     int width;
     int height;
 } State;
@@ -80,13 +85,15 @@ static int shm_file_allocate(size_t size) {
 
 FrameBuffer frame_buffer_allocate(Shm shm, size_t width, size_t height) {
     FrameBuffer result = {0};
-    const size_t stride = width * 4;
-    result.size = stride * height;
+    result.width = width;
+    result.stride = result.width * 4;
+    result.height = height;
+    result.size = result.stride * result.height;
     result.fd = shm_file_allocate(result.size);
     result.pixels = mmap(NULL, result.size, PROT_READ | PROT_WRITE, MAP_SHARED, result.fd, 0);
     assert(result.pixels != MAP_FAILED);
     result.pool = wl_shm_create_pool(shm, result.fd,result.size);
-    result.buffer = wl_shm_pool_create_buffer(result.pool, 0, width, height, stride, WL_SHM_FORMAT_XRGB8888);
+    result.buffer = wl_shm_pool_create_buffer(result.pool, 0, result.width, result.height, result.stride, WL_SHM_FORMAT_XRGB8888);
 
     /*safe to close fd after pool is created*/
     close(result.fd);
@@ -145,9 +152,9 @@ static void xdg_surface_configure(void *data, XdgSurface xdg_surface, uint32_t s
     xdg_surface_ack_configure(xdg_surface, serial);
 
     // TODO: remove this call and factor this into the main loop
-    FrameBuffer test = frame_buffer_allocate(state->shm, 200, 200);
-    wl_surface_attach(state->surface, test.buffer, 0, 0);
-    wl_surface_commit(state->surface);
+//    FrameBuffer test = frame_buffer_allocate(state->shm, 200, 200);
+//    wl_surface_attach(state->surface, test.buffer, 0, 0);
+//    wl_surface_commit(state->surface);
 }
 
 static void
@@ -180,6 +187,14 @@ void xdg_toplevel_wm_capabilities(void *data, XdgToplevel xdg_toplevel, struct w
     printf("TODO: list capabilities");
 }
 
+//// FRAME
+static void frame_listener_done(void *data, struct wl_callback *cb, uint32_t time_ms) {
+    State * state = data;
+    printf("ms: %u\n", time_ms);
+    wl_callback_destroy(cb);
+    state->next_frame = true;
+}
+
 
 //// MAIN
 
@@ -196,6 +211,7 @@ int main() {
         &state
     );
     wl_display_roundtrip(state.display);
+
     xdg_wm_base_add_listener(
         state.xdg_base,
         &(struct xdg_wm_base_listener){
@@ -227,11 +243,68 @@ int main() {
     );
     xdg_toplevel_set_title(state.xdg_toplevel, "Example client");
     wl_surface_commit(state.surface);
+    wl_display_roundtrip(state.display);
+
+    //Create FrameBuffers
+    printf("allocated buffers of size: %d, %d\n", state.width, state.height);
+    state.front_buffer = frame_buffer_allocate(state.shm, state.width, state.height);
+    state.back_buffer = frame_buffer_allocate(state.shm, state.width, state.height);
+    wl_callback_add_listener(wl_surface_frame(state.surface), &(struct wl_callback_listener){.done = frame_listener_done}, &state);
+    wl_surface_attach(state.surface, state.front_buffer.buffer, 0, 0);
+    wl_surface_commit(state.surface);
+    wl_display_roundtrip(state.display);
+    state.next_frame = true;
+
+    int foo = 10;
+    int mod_foo = 1;
+    while (!state.quit) {
+        
+        /* if we have nothing to render, block waiting for events */
+        //if (!state.next_frame) {
+        //    int ret = poll(&pfd, 1, -1); /* wait for compositor events */
+        //    if (ret > 0) {
+        //        if (wl_display_dispatch(state.display) == -1) break;
+        //    }
+        //    continue;
+        //}
+        if(state.next_frame) {
+            state.next_frame = false;
+
+            /* render / attach / commit as you already do */
+            for(int x = 0; x < state.back_buffer.width; ++x) {
+                for(int y = 0; y < state.back_buffer.height; ++y) {
+                    if(x % foo == 0) {
+                        state.back_buffer.pixels[y * state.back_buffer.width + x] = 0x00FFFFFF;
+                    } else {
+                        if(y / foo > 3) {
+                            state.back_buffer.pixels[y * state.back_buffer.width + x] = 0x000000;
+                        } else {
+                            state.back_buffer.pixels[y * state.back_buffer.width + x] = 0x00FFFFFF;
+                        }
+                    }
+                }
+            }
+            foo += mod_foo;
+            if(foo > 150 || foo < 10) mod_foo *= -1;
     
+            FrameBuffer temp = state.front_buffer;
+            state.front_buffer = state.back_buffer;
+            state.back_buffer = temp;
+            //TODO handle resizing
+    
+            wl_callback_add_listener(wl_surface_frame(state.surface), &(struct wl_callback_listener){.done = frame_listener_done}, &state);
+            wl_surface_damage(state.surface, 0, 0, 10000, 10000);
+            wl_surface_attach(state.surface, state.front_buffer.buffer, 0, 0);
+            wl_surface_commit(state.surface);
 
-    while (wl_display_dispatch(state.display)) {
-        /* This space deliberately left blank */
+            wl_display_flush(state.display);
+        }
+
+        /* then wait for compositor to send frame done */
+        //int ret = poll(&pfd, 1, -1);
+        //if (ret > 0) {
+        //    if (wl_display_dispatch(state.display) == -1) break;
+        //}
+        wl_display_dispatch(state.display);
     }
-
-
- }
+}
