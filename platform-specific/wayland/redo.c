@@ -19,6 +19,9 @@
 #include "xdg-shell-client-protocol.h"
 #include "xdg-shell-protocol.c"
 
+#define UNUSED(variable) (void)(variable)
+#define TODO(msg) assert(0 && msg)
+
 typedef struct wl_display * Display;
 typedef struct wl_registry * Registry;
 typedef struct wl_surface * Surface;
@@ -35,12 +38,8 @@ typedef struct xdg_toplevel * XdgToplevel;
 //// STATE
 
 typedef struct {
-    int fd;
     int32_t width;
-    int32_t stride;
     int32_t height;
-    size_t size;
-    Pool pool;
     uint32_t * pixels;
     Buffer buffer;
     bool active;
@@ -56,6 +55,7 @@ typedef struct {
 
     /*Manually Set Variables*/
     Display display;
+    Registry registry;
     Surface surface;
     XdgSurface xdg_surface;
     XdgToplevel xdg_toplevel;
@@ -83,21 +83,30 @@ static int shm_file_allocate(size_t size) {
     return fd;
 }
 
+static size_t frame_buffer_calculate_needed_size(size_t width, size_t height) {
+   const int stride = width * 4;
+   return stride * height;
+}
+
 FrameBuffer frame_buffer_allocate(Shm shm, size_t width, size_t height) {
     FrameBuffer result = {0};
     result.width = width;
-    result.stride = result.width * 4;
     result.height = height;
-    result.size = result.stride * result.height;
-    result.fd = shm_file_allocate(result.size);
-    result.pixels = mmap(NULL, result.size, PROT_READ | PROT_WRITE, MAP_SHARED, result.fd, 0);
+    const int size = frame_buffer_calculate_needed_size(result.width, result.height);
+    const int fd = shm_file_allocate(size);
+    result.pixels = mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
     assert(result.pixels != MAP_FAILED);
-    result.pool = wl_shm_create_pool(shm, result.fd,result.size);
-    result.buffer = wl_shm_pool_create_buffer(result.pool, 0, result.width, result.height, result.stride, WL_SHM_FORMAT_XRGB8888);
-
-    /*safe to close fd after pool is created*/
-    close(result.fd);
+    Pool pool = wl_shm_create_pool(shm, fd, size);
+    result.buffer = wl_shm_pool_create_buffer(pool, 0, result.width, result.height,
+                                              result.width * 4, WL_SHM_FORMAT_XRGB8888);
+    wl_shm_pool_destroy(pool);
+    close(fd);
     return result;
+}
+
+void frame_buffer_free(FrameBuffer buf) {
+    munmap(buf.pixels, frame_buffer_calculate_needed_size(buf.width, buf.height));
+    wl_buffer_destroy(buf.buffer);
 }
 
 //// REGISTRY
@@ -131,12 +140,17 @@ void registry_listener_global_remove (
     Registry r,
     uint32_t name
 ) {
+    UNUSED(data);
+    UNUSED(r);
+    UNUSED(name);
     /*TODO*/
 }
 
 //// BUFFER
 
 static void wl_buffer_release(void *data, struct wl_buffer *wl_buffer){
+    UNUSED(data);
+    TODO("handle this call");
     /* Sent by the compositor when it's no longer using this buffer */
     wl_buffer_destroy(wl_buffer);
 }
@@ -144,17 +158,13 @@ static void wl_buffer_release(void *data, struct wl_buffer *wl_buffer){
 
 //// XDG
 static void xdg_wm_base_ping(void *data, XdgBase b, uint32_t serial){
+    UNUSED(data);
     xdg_wm_base_pong(b, serial);
 }
 
 static void xdg_surface_configure(void *data, XdgSurface xdg_surface, uint32_t serial){
-    State *state = data;
+    UNUSED(data);
     xdg_surface_ack_configure(xdg_surface, serial);
-
-    // TODO: remove this call and factor this into the main loop
-//    FrameBuffer test = frame_buffer_allocate(state->shm, 200, 200);
-//    wl_surface_attach(state->surface, test.buffer, 0, 0);
-//    wl_surface_commit(state->surface);
 }
 
 static void
@@ -162,6 +172,8 @@ xdg_toplevel_configure(void *data,
 		struct xdg_toplevel *xdg_toplevel, int32_t width, int32_t height,
 		struct wl_array *states)
 {
+    UNUSED(xdg_toplevel);
+    UNUSED(states);
     State * state = data;
 	if (width == 0 || height == 0) {
 		/* Compositor is deferring to us */
@@ -174,12 +186,25 @@ xdg_toplevel_configure(void *data,
 static void
 xdg_toplevel_close(void *data, struct xdg_toplevel *toplevel)
 {
+    UNUSED(toplevel);
     State * state = data;
     state->quit = true;
 }
 
 void xdg_toplevel_configure_bounds(void *data, XdgToplevel xdg_toplevel, int32_t width, int32_t height) {
-    printf("resize requested");
+    UNUSED(xdg_toplevel);
+    State * state = data;
+    state->width = width;
+    state->height = height;
+    if(state->front_buffer.pixels != NULL) {
+        frame_buffer_free(state->front_buffer);
+    }
+    if(state->back_buffer.pixels != NULL) {
+        frame_buffer_free(state->back_buffer);
+    }
+    state->front_buffer = frame_buffer_allocate(state->shm, state->width, state->height);
+    state->back_buffer = frame_buffer_allocate(state->shm, state->width, state->height);
+    
 }
 
 void xdg_toplevel_wm_capabilities(void *data, XdgToplevel xdg_toplevel, struct wl_array *capabilities) {
@@ -196,77 +221,70 @@ static void frame_listener_done(void *data, struct wl_callback *cb, uint32_t tim
 }
 
 
+//// INIT
+
+void state_init(State * out) {
+    out->display = wl_display_connect(NULL);
+    Registry registry = wl_display_get_registry(out->display);
+    out->registry = registry;
+    static const struct wl_registry_listener registry_listener = {
+        .global = registry_listener_global,
+        .global_remove = registry_listener_global_remove
+    };
+    wl_registry_add_listener(registry, &registry_listener, out);
+    wl_display_roundtrip(out->display);
+
+    static const struct xdg_wm_base_listener base_listener = {
+        .ping = xdg_wm_base_ping
+    };
+    xdg_wm_base_add_listener(out->xdg_base, &base_listener, out);
+
+    /*XDG STUFF*/
+    out->surface = wl_compositor_create_surface(out->compositor);
+    out->xdg_surface = xdg_wm_base_get_xdg_surface(out->xdg_base, out->surface);
+    static const struct xdg_surface_listener surface_listener = {
+        .configure = xdg_surface_configure
+    };
+    xdg_surface_add_listener(out->xdg_surface, &surface_listener, out);
+    out->xdg_toplevel = xdg_surface_get_toplevel(out->xdg_surface);
+    static const struct xdg_toplevel_listener toplevel_listener = {
+        .configure = xdg_toplevel_configure,
+        .close = xdg_toplevel_close,
+        .configure_bounds = xdg_toplevel_configure_bounds,
+        .wm_capabilities = xdg_toplevel_wm_capabilities
+    };
+    xdg_toplevel_add_listener(out->xdg_toplevel, &toplevel_listener, out);
+    xdg_toplevel_set_title(out->xdg_toplevel, "Example client");
+    wl_surface_commit(out->surface);
+    wl_display_roundtrip(out->display);
+
+    //Create FrameBuffers
+    printf("allocated buffers of size: %d, %d\n", out->width, out->height);
+    out->front_buffer = frame_buffer_allocate(out->shm, out->width, out->height);
+    out->back_buffer = frame_buffer_allocate(out->shm, out->width, out->height);
+    wl_callback_add_listener(wl_surface_frame(out->surface), &(struct wl_callback_listener){.done = frame_listener_done}, out);
+    wl_surface_attach(out->surface, out->front_buffer.buffer, 0, 0);
+    wl_surface_commit(out->surface);
+    wl_display_roundtrip(out->display);
+    out->next_frame = true;
+}
+
+void state_deinit(State * state) {
+    frame_buffer_free(state->front_buffer);
+    frame_buffer_free(state->back_buffer);
+    wl_registry_destroy(state->registry);
+    wl_display_disconnect(state->display);
+ }
+
 //// MAIN
 
 int main() {
     State state = {0};
-    state.display = wl_display_connect(NULL);
-    Registry registry = wl_display_get_registry(state.display);
-    wl_registry_add_listener(
-        registry,
-        &(struct wl_registry_listener){
-            .global = registry_listener_global,
-            .global_remove = registry_listener_global_remove
-        },
-        &state
-    );
-    wl_display_roundtrip(state.display);
-
-    xdg_wm_base_add_listener(
-        state.xdg_base,
-        &(struct xdg_wm_base_listener){
-            .ping = xdg_wm_base_ping
-        },
-        &state
-    );
-
-    /*XDG STUFF*/
-    state.surface = wl_compositor_create_surface(state.compositor);
-    state.xdg_surface = xdg_wm_base_get_xdg_surface(state.xdg_base, state.surface);
-    xdg_surface_add_listener(
-        state.xdg_surface,
-        &(struct xdg_surface_listener){
-            .configure = xdg_surface_configure,
-        },
-        &state
-    );
-    state.xdg_toplevel = xdg_surface_get_toplevel(state.xdg_surface);
-    xdg_toplevel_add_listener(
-        state.xdg_toplevel,
-        &(struct xdg_toplevel_listener){
-            .configure = xdg_toplevel_configure,
-            .close = xdg_toplevel_close,
-            .configure_bounds = xdg_toplevel_configure_bounds,
-            .wm_capabilities = xdg_toplevel_wm_capabilities,
-        },
-        &state
-    );
-    xdg_toplevel_set_title(state.xdg_toplevel, "Example client");
-    wl_surface_commit(state.surface);
-    wl_display_roundtrip(state.display);
-
-    //Create FrameBuffers
-    printf("allocated buffers of size: %d, %d\n", state.width, state.height);
-    state.front_buffer = frame_buffer_allocate(state.shm, state.width, state.height);
-    state.back_buffer = frame_buffer_allocate(state.shm, state.width, state.height);
-    wl_callback_add_listener(wl_surface_frame(state.surface), &(struct wl_callback_listener){.done = frame_listener_done}, &state);
-    wl_surface_attach(state.surface, state.front_buffer.buffer, 0, 0);
-    wl_surface_commit(state.surface);
-    wl_display_roundtrip(state.display);
-    state.next_frame = true;
-
+    state_init(&state);
     int foo = 10;
     int mod_foo = 1;
     while (!state.quit) {
         
-        /* if we have nothing to render, block waiting for events */
-        //if (!state.next_frame) {
-        //    int ret = poll(&pfd, 1, -1); /* wait for compositor events */
-        //    if (ret > 0) {
-        //        if (wl_display_dispatch(state.display) == -1) break;
-        //    }
-        //    continue;
-        //}
         if(state.next_frame) {
             state.next_frame = false;
 
@@ -299,12 +317,7 @@ int main() {
 
             wl_display_flush(state.display);
         }
-
-        /* then wait for compositor to send frame done */
-        //int ret = poll(&pfd, 1, -1);
-        //if (ret > 0) {
-        //    if (wl_display_dispatch(state.display) == -1) break;
-        //}
         wl_display_dispatch(state.display);
     }
+    state_deinit(&state);
 }
