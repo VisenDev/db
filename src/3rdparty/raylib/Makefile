@@ -60,7 +60,7 @@
 # Define required environment variables
 #------------------------------------------------------------------------------------------------
 # Define target platform
-PLATFORM             ?= PLATFORM_DESKTOP
+PLATFORM             ?= PLATFORM_DESKTOP_SDL
 ifeq ($(PLATFORM), PLATFORM_DESKTOP)
     TARGET_PLATFORM   = PLATFORM_DESKTOP_GLFW
 else
