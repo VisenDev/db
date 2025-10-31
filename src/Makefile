@@ -11,7 +11,7 @@ LDFLAGS= -L./3rdparty/raylib/ -lraylib -L./.build/ -lsqlite
 all: main
 
 $(LIBRAYLIB):
-	cd 3rdparty/raylib && PLATFORM=PLATFORM_DESKTOP_GLFW make
+	cd 3rdparty/raylib && PLATFORM=PLATFORM_DESKTOP_GLFW make -j
 
 main: $(BUILDDIR)libsqlite.a $(SRC) $(LIBRAYLIB) Makefile 
 	$(CC) $(CFLAGS) $(SRC) -o main $(LDFLAGS)
