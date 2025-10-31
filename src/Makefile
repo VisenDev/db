@@ -1,12 +1,11 @@
 BUILDDIR= ./.build/
-LIBSQLITE= $(BUILDDIR)sqlite3.o
 SQLITESRC= ./3rdparty/sqlite/sqlite3.c
 SRC= main.c
 LIBRAYLIB= ./3rdparty/raylib/libraylib.a
 CC= gcc
 STD= c99
 CFLAGS= -Wall -Wextra -Wpedantic -std=$(STD) -fsanitize=undefined -g -I3rdparty -lm
-LDFLAGS= -L./3rdparty/raylib/ -lraylib
+LDFLAGS= -L./3rdparty/raylib/ -lraylib -L./.build/ -lsqlite
 
 
 all: main
@@ -17,12 +16,14 @@ $(LIBRAYLIB):
 $(BUILDDIR):
 	mkdir -p $(BUILDDIR)
 
-main: $(LIBSQLITE) $(SRC) $(LIBRAYLIB) Makefile 
-	$(CC) $(CFLAGS) $(LIBSQLITE) $(SRC) -o main $(LDFLAGS)
+main: $(BUILDDIR)libsqlite.a $(SRC) $(LIBRAYLIB) Makefile 
+	$(CC) $(CFLAGS) $(SRC) -o main $(LDFLAGS)
 
+$(BUILDDIR)sqlite.o: $(BUILDDIR) $(SQLITESRC)
+	$(CC) -c $(SQLITESRC) -o $(BUILDDIR)sqlite.o
 
-$(LIBSQLITE): $(BUILDDIR) $(SQLITESRC)
-	$(CC) -c $(SQLITESRC) -o $(LIBSQLITE)
+$(BUILDDIR)libsqlite.a: $(BUILDDIR)sqlite.o
+	ar rcs $(BUILDDIR)libsqlite.a $(BUILDDIR)sqlite.o
 
 run: main
 	./main
