@@ -13,13 +13,11 @@ all: main
 $(LIBRAYLIB):
 	cd 3rdparty/raylib && PLATFORM=PLATFORM_DESKTOP_GLFW make
 
-$(BUILDDIR):
-	mkdir -p $(BUILDDIR)
-
 main: $(BUILDDIR)libsqlite.a $(SRC) $(LIBRAYLIB) Makefile 
 	$(CC) $(CFLAGS) $(SRC) -o main $(LDFLAGS)
 
-$(BUILDDIR)sqlite.o: $(BUILDDIR) $(SQLITESRC)
+$(BUILDDIR)sqlite.o: $(SQLITESRC)
+	mkdir -p $(BUILDDIR)
 	$(CC) -c $(SQLITESRC) -o $(BUILDDIR)sqlite.o
 
 $(BUILDDIR)libsqlite.a: $(BUILDDIR)sqlite.o
