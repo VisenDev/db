@@ -61,12 +61,13 @@ typedef struct {
     XdgToplevel xdg_toplevel;
 
     /*Frame Buffers*/
-    FrameBuffer front_buffer;
-    FrameBuffer back_buffer;
+//    FrameBuffer front_buffer;
+//    FrameBuffer back_buffer
+    FrameBuffer buffer;
 
     /*Application State*/
-    bool quit;
     bool next_frame;
+    bool quit;
     int width;
     int height;
 } State;
@@ -217,7 +218,7 @@ static void frame_listener_done(void *data, struct wl_callback *cb, uint32_t tim
     State * state = data;
     printf("ms: %u\n", time_ms);
     wl_callback_destroy(cb);
-    state->next_frame = true;
+    state->front_buffer_rendering = false;
 }
 
 
@@ -266,7 +267,6 @@ void state_init(State * out) {
     wl_surface_attach(out->surface, out->front_buffer.buffer, 0, 0);
     wl_surface_commit(out->surface);
     wl_display_roundtrip(out->display);
-    out->next_frame = true;
 }
 
 void state_deinit(State * state) {
@@ -276,6 +276,40 @@ void state_deinit(State * state) {
     wl_display_disconnect(state->display);
  }
 
+
+bool application_should_quit(State * state) {
+    if(state->quit) {
+        state_deinit(state);
+        return true;
+    }
+
+    if(state->next_frame) {
+
+    }
+
+
+    FrameBuffer temp = state->front_buffer;
+    state->front_buffer = state->back_buffer;
+    state->back_buffer = temp;
+    //TODO handle resizing
+
+    state->front_buffer_rendering = true;
+    static const struct wl_callback_listener callback_listener = {
+        .done = frame_listener_done
+    };
+    wl_callback_add_listener(wl_surface_frame(state->surface), &callback_listener, &state);
+    wl_surface_damage(state->surface, 0, 0, 10000, 10000);
+    wl_surface_attach(state->surface, state->front_buffer.buffer, 0, 0);
+    wl_surface_commit(state->surface);
+    wl_display_flush(state->display);
+
+    while(state->front_buffer_rendering) {
+        printf("front buffer rendering\n");
+        wl_display_dispatch(state->display);
+    }
+    state->front_buffer_rendering = false;
+}
+
 //// MAIN
 
 int main() {
@@ -283,41 +317,24 @@ int main() {
     state_init(&state);
     int foo = 10;
     int mod_foo = 1;
-    while (!state.quit) {
+    while (!application_should_quit(&state)) {
         
-        if(state.next_frame) {
-            state.next_frame = false;
-
-            /* render / attach / commit as you already do */
-            for(int x = 0; x < state.back_buffer.width; ++x) {
-                for(int y = 0; y < state.back_buffer.height; ++y) {
-                    if(x % foo == 0) {
-                        state.back_buffer.pixels[y * state.back_buffer.width + x] = 0x00FFFFFF;
+        /* render / attach / commit as you already do */
+        for(int x = 0; x < state.back_buffer.width; ++x) {
+            for(int y = 0; y < state.back_buffer.height; ++y) {
+                if(x % foo == 0) {
+                    state.back_buffer.pixels[y * state.back_buffer.width + x] = 0x00FFFFFF;
+                } else {
+                    if(y / foo > 3) {
+                        state.back_buffer.pixels[y * state.back_buffer.width + x] = 0x000000;
                     } else {
-                        if(y / foo > 3) {
-                            state.back_buffer.pixels[y * state.back_buffer.width + x] = 0x000000;
-                        } else {
-                            state.back_buffer.pixels[y * state.back_buffer.width + x] = 0x00FFFFFF;
-                        }
+                        state.back_buffer.pixels[y * state.back_buffer.width + x] = 0x00FFFFFF;
                     }
                 }
             }
-            foo += mod_foo;
-            if(foo > 150 || foo < 10) mod_foo *= -1;
-    
-            FrameBuffer temp = state.front_buffer;
-            state.front_buffer = state.back_buffer;
-            state.back_buffer = temp;
-            //TODO handle resizing
-    
-            wl_callback_add_listener(wl_surface_frame(state.surface), &(struct wl_callback_listener){.done = frame_listener_done}, &state);
-            wl_surface_damage(state.surface, 0, 0, 10000, 10000);
-            wl_surface_attach(state.surface, state.front_buffer.buffer, 0, 0);
-            wl_surface_commit(state.surface);
-
-            wl_display_flush(state.display);
         }
-        wl_display_dispatch(state.display);
+        foo += mod_foo;
+        if(foo > 150 || foo < 10) mod_foo *= -1;
+    
     }
-    state_deinit(&state);
 }
