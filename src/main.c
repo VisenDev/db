@@ -17,11 +17,28 @@
 #define RAYLIB_NUKLEAR_INCLUDE_DEFAULT_FONT
 #include <raylib-nuklear/raylib-nuklear.h>
 
+#define database_create_script_path "./create_database.sql"
 
+core_Bool create_database(const char * path, sqlite3 ** result) {
+    if(access(path, F_OK) == 0) {
+        fprintf(stderr, "File already exists");
+        return CORE_FALSE;
+    } else {
+        int err = sqlite3_open(path, result);
+        if(err != 0) {
+            fprintf(stderr, "Failed to open db");
+            sqlite3_close(*result);
+            return CORE_FALSE;
+        } else {
+            CORE_TODO("finish function");
+        }
+        return CORE_TRUE;
+    }
+}
 
 int main() {
     //    create_new_db("main.db");
-    InitWindow(1000, 1000, "hello");
+    InitWindow(230, 250, "hello");
     struct nk_context * ctx = NULL;
     struct nk_colorf bg;
     bg.r = 0.10f, bg.g = 0.18f, bg.b = 0.24f, bg.a = 1.0f;
