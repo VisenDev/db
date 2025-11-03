@@ -383,7 +383,7 @@ void core_skip_whitespace(FILE * fp)
 
 
 /**** FILE ****/
-int core_file_read_all(FILE * fp, char * outbuf, const unsigned long outbuf_capacity)
+core_Bool core_file_read_all(FILE * fp, char * outbuf, const unsigned long outbuf_capacity)
 #ifdef CORE_IMPLEMENTATION
 {
     unsigned long i = 0;
@@ -391,12 +391,13 @@ int core_file_read_all(FILE * fp, char * outbuf, const unsigned long outbuf_capa
     for(i = 0; !feof(fp); ++i) {
         if(i + 2 >= outbuf_capacity) {
             outbuf[i] = 0;
-            return 1;
+            return CORE_FALSE;
         }
         outbuf[i] = (char)fgetc(fp);
+        if(outbuf[i] == EOF) outbuf[i] = 0;
     }
     outbuf[i] = 0;
-    return 0;
+    return CORE_TRUE;
 }
 #else
 ;

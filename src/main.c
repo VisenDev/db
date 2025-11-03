@@ -17,27 +17,54 @@
 #define RAYLIB_NUKLEAR_INCLUDE_DEFAULT_FONT
 #include <raylib-nuklear/raylib-nuklear.h>
 
-#define database_create_script_path "./create_database.sql"
+#define database_create_script_path "./database_create.sql"
 
-core_Bool create_database(const char * path, sqlite3 ** result) {
+core_Bool database_create(const char * path, sqlite3 ** result) {
     if(access(path, F_OK) == 0) {
-        fprintf(stderr, "File already exists");
+        fprintf(stderr, "File already exists\n");
         return CORE_FALSE;
     } else {
         int err = sqlite3_open(path, result);
         if(err != 0) {
-            fprintf(stderr, "Failed to open db");
+            fprintf(stderr, "Failed to open db\n");
             sqlite3_close(*result);
             return CORE_FALSE;
         } else {
-            CORE_TODO("finish function");
+            const unsigned long n = 20000;
+            char * buf = malloc(n);
+            FILE * fp = fopen(database_create_script_path, "r");
+            assert(fp);
+            
+            if(!core_file_read_all(fp, buf, n)) {
+                fprintf(stderr, "Failed to read whole file\n");
+                free(buf);
+                fclose(fp);
+                sqlite3_close(*result);
+                return CORE_FALSE;
+            } else {
+                char * exec_err = NULL;
+                printf("%s", buf);
+                if(sqlite3_exec(*result, buf, NULL, NULL, &exec_err) != 0) {
+                    fprintf(stderr, "sql execution failed: %s\n", exec_err);
+                    fclose(fp);
+                    free(buf);
+                    sqlite3_close(*result);
+                    return CORE_FALSE;
+                }
+                fclose(fp);
+                free(buf);
+                return CORE_TRUE;
+            }
         }
-        return CORE_TRUE;
     }
 }
 
 int main() {
-    //    create_new_db("main.db");
+    sqlite3 * db = NULL;
+    if(!database_create("main.db", &db)) CORE_FATAL_ERROR("Failed to create database");
+    sqlite3_close(db);
+    exit(0);
+
     InitWindow(230, 250, "hello");
     struct nk_context * ctx = NULL;
     struct nk_colorf bg;

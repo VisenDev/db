@@ -13,6 +13,8 @@ all: main
 $(LIBRAYLIB):
 	cd 3rdparty/raylib && PLATFORM=PLATFORM_DESKTOP_GLFW make -j
 
+.PHONY: main
+
 main: $(BUILDDIR)libsqlite.a $(SRC) $(LIBRAYLIB) Makefile 
 	$(CC) $(CFLAGS) $(SRC) -o main $(LDFLAGS)
 
@@ -29,4 +31,8 @@ run: main
 clean:
 	if [ -e $(BUILDDIR) ]; then trash $(BUILDDIR); fi
 	if [ -e main ]; then trash main; fi
+	if [ -e main.db ]; then trash main.db; fi
 	cd 3rdparty/raylib/ && make clean
+
+TAGS:
+	find . -name '*.[ch]' -type f -exec etags {} +
