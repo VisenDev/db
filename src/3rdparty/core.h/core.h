@@ -383,25 +383,52 @@ void core_skip_whitespace(FILE * fp)
 
 
 /**** FILE ****/
-core_Bool core_file_read_all(FILE * fp, char * outbuf, const unsigned long outbuf_capacity)
+
+core_Bool core_file_read_all(FILE * fp, char * dst, const unsigned long dst_cap)
 #ifdef CORE_IMPLEMENTATION
 {
-    unsigned long i = 0;
-    assert(fp != NULL);
-    for(i = 0; !feof(fp); ++i) {
-        if(i + 2 >= outbuf_capacity) {
-            outbuf[i] = 0;
-            return CORE_FALSE;
-        }
-        outbuf[i] = (char)fgetc(fp);
-        if(outbuf[i] == EOF) outbuf[i] = 0;
-    }
-    outbuf[i] = 0;
+    unsigned long count = fread(dst, 1, dst_cap - 1, fp);
+    dst[dst_cap - 1] = 0;
+    if(count >= dst_cap - 1) return CORE_FALSE;
     return CORE_TRUE;
 }
 #else
 ;
 #endif /*CORE_IMPLEMENTATION*/
+
+char * core_file_read_all_arena(core_Arena * arena, FILE * fp)
+#ifdef CORE_IMPLEMENTATION
+{
+    unsigned long n = 128;
+    unsigned long i = 0;
+    char * buf = core_arena_alloc(arena, n);
+    if (buf == NULL) return NULL;
+    while(!feof(fp)) {
+        unsigned long available = n - i - 1;
+        const unsigned long elem_size = 1;
+        unsigned long count = fread(&buf[i], elem_size, available, fp);
+        i += count;
+        if (i >= n - 1) {
+            n *= 2;
+            buf = core_arena_realloc(arena, buf, n);
+            if (buf == NULL) return NULL;
+        }
+    }
+    buf[i] = 0;
+    return buf;
+}
+#else
+;
+#endif /* CORE_IMPLEMENTATION */
+
+
+/*TODO
+  
+  CORE_ERR
+  CORE_OK
+
+  CORE_LOG_ERROR
+*/
 
 
 /**** DEFER ****/

@@ -30,34 +30,25 @@ core_Bool database_create(const char * path, sqlite3 ** result) {
             sqlite3_close(*result);
             return CORE_FALSE;
         } else {
-            const unsigned long n = 20000;
-            char * buf = malloc(n);
+            core_Arena arena = {0};
             FILE * fp = fopen(database_create_script_path, "r");
-            assert(fp);
-            
-            if(!core_file_read_all(fp, buf, n)) {
-                fprintf(stderr, "Failed to read whole file\n");
-                free(buf);
-                fclose(fp);
+            char * buf = core_file_read_all_arena(&arena, fp);
+            fclose(fp);
+            char * exec_err = NULL;
+            printf("%s", buf);
+            if(sqlite3_exec(*result, buf, NULL, NULL, &exec_err) != 0) {
+                fprintf(stderr, "sql execution failed: %s\n", exec_err);
+                core_arena_free(&arena);
                 sqlite3_close(*result);
                 return CORE_FALSE;
-            } else {
-                char * exec_err = NULL;
-                printf("%s", buf);
-                if(sqlite3_exec(*result, buf, NULL, NULL, &exec_err) != 0) {
-                    fprintf(stderr, "sql execution failed: %s\n", exec_err);
-                    fclose(fp);
-                    free(buf);
-                    sqlite3_close(*result);
-                    return CORE_FALSE;
-                }
-                fclose(fp);
-                free(buf);
-                return CORE_TRUE;
             }
+            core_arena_free(&arena);
+            return CORE_TRUE;
         }
     }
 }
+            
+
 
 int main() {
     sqlite3 * db = NULL;
