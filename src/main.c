@@ -47,16 +47,20 @@ core_Bool database_create(const char * path, sqlite3 ** result) {
         }
     }
 }
-            
 
+typedef enum {
+    MENU_TAG_NEW_ITEM,
+    MENU_TAG_VIEW_TABLES
+} MenuTag;
 
 int main() {
     sqlite3 * db = NULL;
-    if(!database_create("main.db", &db)) CORE_FATAL_ERROR("Failed to create database");
+    /*if(!database_create("main.db", &db)) CORE_FATAL_ERROR("Failed to create database");*/
     sqlite3_close(db);
-    exit(0);
 
-    InitWindow(230, 250, "hello");
+    InitWindow(1000, 700, "db");
+    SetWindowState(FLAG_WINDOW_RESIZABLE);
+
     struct nk_context * ctx = NULL;
     struct nk_colorf bg;
     bg.r = 0.10f, bg.g = 0.18f, bg.b = 0.24f, bg.a = 1.0f;
@@ -68,7 +72,25 @@ int main() {
 
         UpdateNuklear(ctx);
         /* GUI */
-        if (nk_begin(ctx, "Demo", nk_rect(50, 50, 230, 250), NK_WINDOW_BORDER|NK_WINDOW_MOVABLE|NK_WINDOW_SCALABLE| NK_WINDOW_MINIMIZABLE|NK_WINDOW_TITLE)) {
+        if (nk_begin(ctx, "db", nk_rect(0, 0, GetScreenWidth(), GetScreenHeight()), NK_WINDOW_BORDER)) {
+            nk_menubar_begin(ctx);
+            {
+                /* toolbar */
+                nk_layout_row_static(ctx, 40, 100, 3);
+                /*if (nk_menu_begin_text(ctx, "Music", 50, NK_TEXT_RIGHT, nk_vec2(110,120)))*/
+                /*    {                                                                     */
+                /*                    nk_layout_row_dynamic(ctx, 25, 1);                    */
+                /*        nk_menu_item_text(ctx, "Play", 10, NK_TEXT_RIGHT);                */
+                /*        nk_menu_item_text(ctx, "Stop", 10, NK_TEXT_RIGHT);                */
+                /*        nk_menu_item_text(ctx, "Pause", 10, NK_TEXT_RIGHT);               */
+                /*        nk_menu_item_text(ctx, "Next", 10, NK_TEXT_RIGHT);                */
+                /*        nk_menu_item_text(ctx, "Prev", 10, NK_TEXT_RIGHT);                */
+                /*        nk_menu_end(ctx);                                                 */
+                /*    }                                                                     */
+                nk_button_text(ctx, "Home", 10);
+                nk_button_text(ctx, "New", 10);
+                nk_button_text(ctx, "Inventory", 10);
+            }
             enum {EASY, HARD};
             static int op = EASY;
             static int property = 20;
