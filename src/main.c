@@ -53,9 +53,31 @@ typedef enum {
     MENU_TAG_VIEW_TABLES
 } MenuTag;
 
+void db_iterate_table(sqlite3 * db, const char * table_name) {
+    sqlite3_stmt * stmt;
+    /*int len = snprintf(buf, sizeof(buf), "pragma table_info(%s);\n", table_name);*/
+    char sql[] = "pragma table_info(?);";
+    if(sqlite3_prepare_v2(db, sql, sizeof(sql), &stmt, NULL) != 0) {
+        CORE_FATAL_ERROR("Failed to prepare statement");
+    }
+    sqlite3_bind_text(stmt, 1, table_name, -1, SQLITE_STATIC);
+
+    int code;
+    int i = 0;
+    while((code = sqlite3_step(stmt)) == SQLITE_STEP) {
+        int type = sqlite3_column_type(stmt, i);
+        switch(type) {
+        case SQLITE_INTEGER:
+            printf("%d,", sqlite3_column_int(i));
+            break;
+        }
+        ++i;
+    }
+}
+
 int main() {
     sqlite3 * db = NULL;
-    /*if(!database_create("main.db", &db)) CORE_FATAL_ERROR("Failed to create database");*/
+    if(!database_create("main.db", &db)) CORE_FATAL_ERROR("Failed to create database");
     sqlite3_close(db);
 
     InitWindow(1000, 700, "db");
