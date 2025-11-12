@@ -55,30 +55,63 @@ typedef enum {
 
 void db_iterate_table(sqlite3 * db, const char * table_name) {
     sqlite3_stmt * stmt;
-    /*int len = snprintf(buf, sizeof(buf), "pragma table_info(%s);\n", table_name);*/
-    char sql[] = "pragma table_info(?);";
-    if(sqlite3_prepare_v2(db, sql, sizeof(sql), &stmt, NULL) != 0) {
+    char sql[] = "pragma table_info(customers);";
+    int err;
+    const char * unused;
+    
+    if((err = sqlite3_prepare_v2(db, sql, -1, &stmt, &unused)) != SQLITE_OK) {
+        fprintf(stderr, "\n%s\n", sqlite3_errstr(err));
         CORE_FATAL_ERROR("Failed to prepare statement");
     }
-    sqlite3_bind_text(stmt, 1, table_name, -1, SQLITE_STATIC);
+    /*sqlite3_bind_text(stmt, 1, table_name, -1, SQLITE_STATIC);*/
 
     int code;
-    int i = 0;
-    while((code = sqlite3_step(stmt)) == SQLITE_STEP) {
-        int type = sqlite3_column_type(stmt, i);
-        switch(type) {
-        case SQLITE_INTEGER:
-            printf("%d,", sqlite3_column_int(i));
-            break;
+    while((code = sqlite3_step(stmt)) == SQLITE_ROW) {
+        int col;
+        int count = sqlite3_column_count(stmt);
+        for(col = 0; col < count; ++col) {
+            int type = sqlite3_column_type(stmt, col);
+            switch(type) {
+            case SQLITE_INTEGER:
+                printf("%d,", sqlite3_column_int(stmt, col));
+                break;
+            case SQLITE_FLOAT:
+                printf("%lf,", sqlite3_column_double(stmt, col));
+                break;
+            case SQLITE_TEXT:
+                printf("%s,", sqlite3_column_text(stmt, col));
+                break;
+            case SQLITE_BLOB: {
+                int bytes = sqlite3_column_bytes(stmt, col);
+                (void)bytes;
+                printf("%p,", sqlite3_column_blob(stmt, col));
+            } break;
+            case SQLITE_NULL:
+                printf("NULL,");
+                break;
+            }
         }
-        ++i;
+        printf("\n");
     }
+    if(code != SQLITE_DONE) {
+        CORE_FATAL_ERROR("step returned error");
+    }
+    sqlite3_finalize(stmt);
 }
 
 int main() {
     sqlite3 * db = NULL;
-    if(!database_create("main.db", &db)) CORE_FATAL_ERROR("Failed to create database");
+    int err;
+    if(access("main.db", F_OK) != 0) {
+        if(!database_create("main.db", &db)) CORE_FATAL_ERROR("Failed to create database");
+    } else {
+        if((err = sqlite3_open("main.db", &db)) != SQLITE_OK) {
+            CORE_FATAL_ERROR(sqlite3_errstr(err));
+        }
+    }
+    db_iterate_table(db, "customers");
     sqlite3_close(db);
+    exit(0);
 
     InitWindow(1000, 700, "db");
     SetWindowState(FLAG_WINDOW_RESIZABLE);
