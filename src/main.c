@@ -98,7 +98,7 @@ void db_iterate_table(sqlite3 * db, const char * table_name) {
     sqlite3_finalize(stmt);
 }
 
-void db_data_insert(sqlite3 * db, const char * table_name) {
+sqlite3_stmt * db_table_info(sqlite3 * db, const char * table_name) {
     sqlite3_stmt * stmt;
     char sql[256];
     const char * unused;
@@ -107,36 +107,94 @@ void db_data_insert(sqlite3 * db, const char * table_name) {
     
     if((code = sqlite3_prepare_v2(db, sql, -1, &stmt, &unused)) != SQLITE_OK) {
         fprintf(stderr, "\n%s\n", sqlite3_errstr(code));
-        CORE_FATAL_ERROR("Failed to prepare statement");
+        return NULL;
+    }
+    return stmt;
+}
+
+/*
+typedef struct {
+    const char * name;
+    int type;
+} db_TableMetadataEntry;
+
+typedef core_Vec(db_TableMetadataEntry) db_TableMetadata;
+
+core_Bool db_table_metadata(sqlite3 * db, core_Arena * a, const char * table_name, db_TableMetadata * out) {
+    sqlite3_stmt * stmt;
+    char sql[256];
+    const char * unused;
+    int code;
+    db_TableMetadata meta = {0};
+    (void)meta;
+    sqlite3_snprintf(sizeof(sql), sql, "pragma table_info(%s);", table_name);
+    
+    if((code = sqlite3_prepare_v2(db, sql, -1, &stmt, &unused)) != SQLITE_OK) {
+        fprintf(stderr, "\n%s\n", sqlite3_errstr(code));
+        return CORE_FALSE;
     }
 
     while((code = sqlite3_step(stmt)) == SQLITE_ROW) {
-        int col;
-        int count = sqlite3_column_count(stmt);
-        for(col = 0; col < count; ++col) {
-            int type = sqlite3_column_type(stmt, col);
-            switch(type) {
-            case SQLITE_INTEGER:
-                printf("%d,", sqlite3_column_int(stmt, col));
-                break;
-            case SQLITE_FLOAT:
-                printf("%lf,", sqlite3_column_double(stmt, col));
-                break;
-            case SQLITE_TEXT:
-                printf("%s,", sqlite3_column_text(stmt, col));
-                break;
-            case SQLITE_BLOB: {
-                int bytes = sqlite3_column_bytes(stmt, col);
-                (void)bytes;
-                printf("%p,", sqlite3_column_blob(stmt, col));
-            } break;
-            case SQLITE_NULL:
-                printf("NULL,");
-                break;
-            }
+        db_TableMetadataEntry entry = {0};
+        char * typestr = sqlite3_column_str(stmt, 2);
+        if(strcmp("TEXT", typestr) == 0) {
+            typestr = SQLITE_TEXT;
         }
-        printf("\n");
+        entry.name
     }
+}
+*/
+
+typedef enum {
+    DB_STATUS_PENDING,
+    DB_STATUS_DONE
+} db_Status;
+
+db_Status db_customer_new(sqlite3 * db, struct nk_context * ctx) {
+    static char name[256];
+    static int name_len = 0;
+    static char email[256];
+    static int email_len = 0;
+    static char city[256];
+    static int city_len = 0;
+    db_Status ret = DB_STATUS_DONE;
+    if(nk_group_begin(ctx, "New Customer", 0)) {
+        nk_layout_row_dynamic(ctx, 25, 2);
+    
+        nk_label(ctx, "Customer Name: ", NK_TEXT_RIGHT);
+        nk_edit_string(ctx, NK_EDIT_FIELD, name, &name_len, sizeof(name), NULL);
+
+        nk_label(ctx, "Customer Email: ", NK_TEXT_RIGHT);
+        nk_edit_string(ctx, NK_EDIT_FIELD, email, &email_len, sizeof(email), NULL);
+
+        nk_label(ctx, "Customer City: ", NK_TEXT_RIGHT);
+        nk_edit_string(ctx, NK_EDIT_FIELD, city, &city_len, sizeof(city), NULL);
+
+        if(nk_button_text(ctx, "Save", 50)) {
+            int err;
+            sqlite3_stmt * stmt;
+            const char sql[] = "insert into customers(name, email, city) values(?, ?, ?);";
+            err = sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
+            if(err != SQLITE_OK) {
+                fprintf(stderr, "\n%s\n", sqlite3_errstr(err));
+                fprintf(stderr, "\n%s\n", sqlite3_errmsg(db));
+                CORE_TODO("Add an error handling popup");
+            }
+            sqlite3_bind_text(stmt, 1, name, name_len, SQLITE_TRANSIENT);
+            sqlite3_bind_text(stmt, 2, email, email_len, SQLITE_TRANSIENT);
+            sqlite3_bind_text(stmt, 3, city, city_len, SQLITE_TRANSIENT);
+            if(sqlite3_step(stmt) != SQLITE_DONE) {
+                CORE_TODO("Handle error");
+            }
+            sqlite3_finalize(stmt);
+            ret = DB_STATUS_DONE;
+        } else {
+            ret = DB_STATUS_PENDING;
+        }
+        
+        nk_group_end(ctx);
+    }
+    return ret;
 }
 
 int main() {
@@ -150,7 +208,7 @@ int main() {
         }
     }
     db_iterate_table(db, "customers");
-    sqlite3_close(db);
+
 
     InitWindow(1000, 700, "db");
     SetWindowState(FLAG_WINDOW_RESIZABLE);
@@ -167,6 +225,8 @@ int main() {
         UpdateNuklear(ctx);
         /* GUI */
         if (nk_begin(ctx, "db", nk_rect(0, 0, GetScreenWidth(), GetScreenHeight()), NK_WINDOW_BORDER)) {
+
+            
             nk_menubar_begin(ctx);
             {
                 /* toolbar */
@@ -198,6 +258,10 @@ int main() {
             nk_layout_row_dynamic(ctx, 22, 1);
             nk_property_int(ctx, "Compression:", 0, &property, 100, 10, 1);
 
+            nk_layout_row_dynamic(ctx, 200, 1);
+            db_customer_new(db, ctx);
+
+
 
             static int value = 0;
             static char buffer[32];
@@ -223,6 +287,8 @@ int main() {
                 bg.a = nk_propertyf(ctx, "#A:", 0, bg.a, 1.0f, 0.01f,0.005f);
                 nk_combo_end(ctx);
             }
+
+
         }
         nk_end(ctx);
 
@@ -237,4 +303,5 @@ int main() {
     }
     
     CloseWindow();
+    sqlite3_close(db);
 }
