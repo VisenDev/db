@@ -55,17 +55,16 @@ typedef enum {
 
 void db_iterate_table(sqlite3 * db, const char * table_name) {
     sqlite3_stmt * stmt;
-    char sql[] = "pragma table_info(customers);";
-    int err;
+    char sql[256];
     const char * unused;
+    int code;
+    sqlite3_snprintf(sizeof(sql), sql, "pragma table_info(%s);", table_name);
     
-    if((err = sqlite3_prepare_v2(db, sql, -1, &stmt, &unused)) != SQLITE_OK) {
-        fprintf(stderr, "\n%s\n", sqlite3_errstr(err));
+    if((code = sqlite3_prepare_v2(db, sql, -1, &stmt, &unused)) != SQLITE_OK) {
+        fprintf(stderr, "\n%s\n", sqlite3_errstr(code));
         CORE_FATAL_ERROR("Failed to prepare statement");
     }
-    /*sqlite3_bind_text(stmt, 1, table_name, -1, SQLITE_STATIC);*/
 
-    int code;
     while((code = sqlite3_step(stmt)) == SQLITE_ROW) {
         int col;
         int count = sqlite3_column_count(stmt);
@@ -99,6 +98,47 @@ void db_iterate_table(sqlite3 * db, const char * table_name) {
     sqlite3_finalize(stmt);
 }
 
+void db_data_insert(sqlite3 * db, const char * table_name) {
+    sqlite3_stmt * stmt;
+    char sql[256];
+    const char * unused;
+    int code;
+    sqlite3_snprintf(sizeof(sql), sql, "pragma table_info(%s);", table_name);
+    
+    if((code = sqlite3_prepare_v2(db, sql, -1, &stmt, &unused)) != SQLITE_OK) {
+        fprintf(stderr, "\n%s\n", sqlite3_errstr(code));
+        CORE_FATAL_ERROR("Failed to prepare statement");
+    }
+
+    while((code = sqlite3_step(stmt)) == SQLITE_ROW) {
+        int col;
+        int count = sqlite3_column_count(stmt);
+        for(col = 0; col < count; ++col) {
+            int type = sqlite3_column_type(stmt, col);
+            switch(type) {
+            case SQLITE_INTEGER:
+                printf("%d,", sqlite3_column_int(stmt, col));
+                break;
+            case SQLITE_FLOAT:
+                printf("%lf,", sqlite3_column_double(stmt, col));
+                break;
+            case SQLITE_TEXT:
+                printf("%s,", sqlite3_column_text(stmt, col));
+                break;
+            case SQLITE_BLOB: {
+                int bytes = sqlite3_column_bytes(stmt, col);
+                (void)bytes;
+                printf("%p,", sqlite3_column_blob(stmt, col));
+            } break;
+            case SQLITE_NULL:
+                printf("NULL,");
+                break;
+            }
+        }
+        printf("\n");
+    }
+}
+
 int main() {
     sqlite3 * db = NULL;
     int err;
@@ -111,7 +151,6 @@ int main() {
     }
     db_iterate_table(db, "customers");
     sqlite3_close(db);
-    exit(0);
 
     InitWindow(1000, 700, "db");
     SetWindowState(FLAG_WINDOW_RESIZABLE);
@@ -158,6 +197,18 @@ int main() {
             if (nk_option_label(ctx, "hard", op == HARD)) op = HARD;
             nk_layout_row_dynamic(ctx, 22, 1);
             nk_property_int(ctx, "Compression:", 0, &property, 100, 10, 1);
+
+
+            static int value = 0;
+            static char buffer[32];
+            snprintf(buffer, sizeof(buffer), "%d", value);
+
+            nk_layout_row_dynamic(ctx, 30, 1);
+            if (nk_edit_string_zero_terminated(ctx, NK_EDIT_FIELD, buffer, sizeof(buffer), nk_filter_decimal)) {
+                value = atoi(buffer);
+            }
+
+            nk_label(ctx, buffer, NK_TEXT_LEFT);
 
             nk_layout_row_dynamic(ctx, 20, 1);
             nk_label(ctx, "background:", NK_TEXT_LEFT);
