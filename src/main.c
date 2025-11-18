@@ -27,19 +27,21 @@ core_Bool db_exec_sql_file(sqlite3 * db, const char * sql_file_path) {
 }
 
 typedef enum {
-    MENU_TAG_NEW_ITEM,
-    MENU_TAG_VIEW_TABLES
-} MenuTag;
+    DB_MENU_TAB_HOME,
+    DB_MENU_TAB_CUSTOMERS,
+    DB_MENU_TAB_OPEN_ORDERS,
+    DB_MENU_TAB_COUNT
+} db_MenuTab;
 
 typedef enum {
     DB_STATUS_PENDING,
     DB_STATUS_DONE
 } db_Status;
 
-
 typedef struct {
     core_Arena * arena;
     sqlite3 * db;
+    db_MenuTab menu_tab;
     struct nk_context * ctx;
 } db_State;
 
@@ -53,7 +55,7 @@ db_Status db_customer_new(db_State * s) {
     static char city[256];
     static int city_len = 0;
     db_Status ret = DB_STATUS_DONE;
-    if (nk_begin(s->ctx, "Add New Customer", nk_rect(50, 50, 430, 650),
+    if (nk_begin(s->ctx, "Add New Customer", nk_rect(100, 100, 430, 650),
                  NK_WINDOW_BORDER|NK_WINDOW_MOVABLE|NK_WINDOW_SCALABLE|
                  NK_WINDOW_MINIMIZABLE|NK_WINDOW_TITLE
         )) {
@@ -93,6 +95,69 @@ db_Status db_customer_new(db_State * s) {
     }
     nk_end(s->ctx);
     return ret;
+}
+
+void db_menu_tab_button(db_State * s, const char * label, db_MenuTab menu_tab) {
+    struct nk_rect bounds = nk_widget_bounds(s->ctx);
+    const struct nk_input *in = &s->ctx->input;
+    char buf[1024];
+    db_MenuTab active = s->menu_tab;
+    if (nk_input_is_mouse_hovering_rect(in, bounds)) {
+        if(menu_tab == active) {
+            sqlite3_snprintf(sizeof(buf), buf, "Currently working on \"%s\"", label);
+        } else {
+            sqlite3_snprintf(sizeof(buf), buf, "Click to swap to \"%s\"", label);
+        }
+        nk_tooltip(s->ctx, buf);
+    }
+
+    if(menu_tab == active) {
+        nk_style_push_style_item(s->ctx, &s->ctx->style.button.normal, s->ctx->style.window.fixed_background);
+        nk_style_push_color(s->ctx, &s->ctx->style.button.border_color, s->ctx->style.window.background);
+        nk_style_push_style_item(s->ctx, &s->ctx->style.button.hover, s->ctx->style.window.fixed_background);
+        nk_style_push_style_item(s->ctx, &s->ctx->style.button.active, s->ctx->style.window.fixed_background);
+    }
+
+    if(nk_button_label(s->ctx, label)) s->menu_tab = menu_tab;
+
+    if(menu_tab == active) {
+        nk_style_pop_style_item(s->ctx);
+        nk_style_pop_color(s->ctx);
+        nk_style_pop_style_item(s->ctx);
+        nk_style_pop_style_item(s->ctx);
+    }
+}
+
+
+void db_application_run(db_State *s) {
+
+    /*tabs*/
+    if(nk_begin(s->ctx, "db", nk_rect(0, 0, GetScreenWidth(), GetScreenHeight()), 0)) {
+        nk_layout_row_static(s->ctx, 30, 200, DB_MENU_TAB_COUNT);
+        db_menu_tab_button(s, "Home", DB_MENU_TAB_HOME);
+        db_menu_tab_button(s, "Customers", DB_MENU_TAB_CUSTOMERS);
+        db_menu_tab_button(s, "Open Orders", DB_MENU_TAB_OPEN_ORDERS);
+    }
+
+    switch(s->menu_tab) {
+    case DB_MENU_TAB_HOME: {
+        nk_label(s->ctx, "Welcome to db!", NK_TEXT_RIGHT);
+    } break;
+    case DB_MENU_TAB_OPEN_ORDERS: {
+        nk_label(s->ctx, "<in development, this page will show open orders>", NK_TEXT_RIGHT);
+    } break;
+    case DB_MENU_TAB_CUSTOMERS: {
+        nk_label(s->ctx, "<in development, this page will show open customers>", NK_TEXT_RIGHT);
+    } break;
+    case DB_MENU_TAB_COUNT:
+        CORE_UNREACHABLE;
+    }
+    nk_end(s->ctx);
+
+
+    /*popup*/
+    db_customer_new(s);
+
 }
 
 void db_application_init(db_State ** out) {
@@ -156,13 +221,15 @@ core_Bool db_application_should_close(db_State * s) {
     return WindowShouldClose();
 }
 
+
+
 int main() {
     db_State * s;
     db_application_init(&s);
  
     while(!db_application_should_close(s)) {
         db_application_frame_begin(s);
-        db_customer_new(s);
+        db_application_run(s);
         db_application_frame_end(s);
     }
 
