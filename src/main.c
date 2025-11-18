@@ -55,11 +55,8 @@ db_Status db_customer_new(db_State * s) {
     static char city[256];
     static int city_len = 0;
     db_Status ret = DB_STATUS_DONE;
-    if (nk_begin(s->ctx, "Add New Customer", nk_rect(100, 100, 430, 650),
-                 NK_WINDOW_BORDER|NK_WINDOW_MOVABLE|NK_WINDOW_SCALABLE|
-                 NK_WINDOW_MINIMIZABLE|NK_WINDOW_TITLE
-        )) {
-        nk_layout_row_dynamic(s->ctx, 25, 2);
+    if (nk_group_begin_titled(s->ctx, "Add New Customer", "Add New Customer", NK_WINDOW_BORDER | NK_WINDOW_TITLE)) {
+        nk_layout_row_dynamic(s->ctx, 30, 2);
     
         nk_label(s->ctx, "Customer Name: ", NK_TEXT_RIGHT);
         nk_edit_string(s->ctx, NK_EDIT_FIELD, name, &name_len, sizeof(name), NULL);
@@ -91,9 +88,8 @@ db_Status db_customer_new(db_State * s) {
         } else {
             ret = DB_STATUS_PENDING;
         }
-        
     }
-    nk_end(s->ctx);
+    nk_group_end(s->ctx);
     return ret;
 }
 
@@ -132,7 +128,7 @@ void db_menu_tab_button(db_State * s, const char * label, db_MenuTab menu_tab) {
 void db_application_run(db_State *s) {
 
     /*tabs*/
-    if(nk_begin(s->ctx, "db", nk_rect(0, 0, GetScreenWidth(), GetScreenHeight()), 0)) {
+    if(nk_begin(s->ctx, "db", nk_rect(0, 0, GetScreenWidth(), GetScreenHeight()), NK_WINDOW_BORDER)) {
         nk_layout_row_static(s->ctx, 30, 200, DB_MENU_TAB_COUNT);
         db_menu_tab_button(s, "Home", DB_MENU_TAB_HOME);
         db_menu_tab_button(s, "Customers", DB_MENU_TAB_CUSTOMERS);
@@ -147,17 +143,25 @@ void db_application_run(db_State *s) {
         nk_label(s->ctx, "<in development, this page will show open orders>", NK_TEXT_RIGHT);
     } break;
     case DB_MENU_TAB_CUSTOMERS: {
+        nk_layout_row_template_begin(s->ctx, 500);
+        nk_layout_row_template_push_variable(s->ctx, 80);
+        nk_layout_row_template_push_static(s->ctx, 400);
+        nk_layout_row_template_end(s->ctx);
+
+        nk_group_begin(s->ctx, "label", 0);
+        nk_layout_row_dynamic(s->ctx, 20, 1);
         nk_label(s->ctx, "<in development, this page will show open customers>", NK_TEXT_RIGHT);
+        nk_label(s->ctx, "<in development, this page will show open customers>", NK_TEXT_RIGHT);
+        nk_label(s->ctx, "<in development, this page will show open customers>", NK_TEXT_RIGHT);
+        nk_label(s->ctx, "<in development, this page will show open customers>", NK_TEXT_RIGHT);
+        nk_group_end(s->ctx);
+
+        db_customer_new(s);
     } break;
     case DB_MENU_TAB_COUNT:
         CORE_UNREACHABLE;
     }
     nk_end(s->ctx);
-
-
-    /*popup*/
-    db_customer_new(s);
-
 }
 
 void db_application_init(db_State ** out) {
