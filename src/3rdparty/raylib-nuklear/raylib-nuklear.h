@@ -53,7 +53,7 @@
 #endif  // NDEBUG
 #endif  // NK_ASSERT
 
-#include "nuklear.h"
+#include <nuklear/nuklear.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -116,7 +116,7 @@ NK_API void nk_raylib_input_mouse(struct nk_context * ctx);
 #endif  // NK_INV_SQRT
 
 #define NK_IMPLEMENTATION
-#include "nuklear.h"
+#include <nuklear/nuklear.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -223,8 +223,9 @@ nk_raylib_clipboard_paste(nk_handle usr, struct nk_text_edit *edit)
 NK_API void
 nk_raylib_clipboard_copy(nk_handle usr, const char *text, int len)
 {
-    NK_UNUSED(usr);
+    
     char* trimmedText = (char*)MemAlloc((unsigned int)(sizeof(char) * (size_t)(len + 1)));
+    NK_UNUSED(usr);
     if(!trimmedText)
         return;
     nk_memcopy(trimmedText, text, (nk_size)len);
@@ -266,13 +267,15 @@ nk_raylib_mfree(nk_handle unused, void *ptr)
 NK_API struct nk_context*
 InitNuklearContext(struct nk_user_font* userFont)
 {
+    struct NuklearUserData* userData = NULL;
+    struct nk_allocator alloc;
     struct nk_context* ctx = (struct nk_context*)MemAlloc(sizeof(struct nk_context));
     if (ctx == NULL) {
         TraceLog(LOG_ERROR, "NUKLEAR: Failed to initialize nuklear memory");
         return NULL;
     }
 
-    struct NuklearUserData* userData = (struct NuklearUserData*)MemAlloc(sizeof(struct NuklearUserData));
+    userData = (struct NuklearUserData*)MemAlloc(sizeof(struct NuklearUserData));
     if (userData == NULL) {
         TraceLog(LOG_ERROR, "NUKLEAR: Failed to initialize nuklear user data");
         MemFree(ctx);
@@ -280,7 +283,6 @@ InitNuklearContext(struct nk_user_font* userFont)
     }
 
     // Allocator
-    struct nk_allocator alloc;
     alloc.userdata = nk_handle_ptr(0);
     alloc.alloc = nk_raylib_malloc;
     alloc.free = nk_raylib_mfree;
@@ -300,10 +302,12 @@ InitNuklearContext(struct nk_user_font* userFont)
 
     // Set the internal user data.
     userData->scaling = 1.0f;
-    nk_handle userDataHandle;
-    userDataHandle.id = 1;
-    userDataHandle.ptr = (void*)userData;
-    nk_set_user_data(ctx, userDataHandle);
+    {
+        nk_handle userDataHandle;
+        userDataHandle.id = 1;
+        userDataHandle.ptr = (void*)userData;
+        nk_set_user_data(ctx, userDataHandle);
+    }
 
     TraceLog(LOG_INFO, "NUKLEAR: Initialized GUI");
 
@@ -362,13 +366,15 @@ InitNuklearEx(Font font, float fontSize)
     newFont->texture = font.texture;
 
     // Create the nuklear user font.
-    struct nk_user_font* userFont = (struct nk_user_font*)MemAlloc(sizeof(struct nk_user_font));
-    userFont->userdata = nk_handle_ptr(newFont);
-    userFont->height = fontSize;
-    userFont->width = nk_raylib_font_get_text_width_user_font;
+    {
+        struct nk_user_font* userFont = (struct nk_user_font*)MemAlloc(sizeof(struct nk_user_font));
+        userFont->userdata = nk_handle_ptr(newFont);
+        userFont->height = fontSize;
+        userFont->width = nk_raylib_font_get_text_width_user_font;
 
-    // Nuklear context.
-    return InitNuklearContext(userFont);
+        // Nuklear context.
+        return InitNuklearContext(userFont);
+    }
 }
 
 /**
@@ -459,13 +465,16 @@ ColorToNuklearF(Color color)
 NK_API void
 DrawNuklear(struct nk_context * ctx)
 {
+    const struct nk_command *cmd;
+    float scale;
+    
     // Protect against drawing when there's nothing to draw.
     if (ctx == NULL) {
         return;
     }
 
-    const struct nk_command *cmd;
-    const float scale = GetNuklearScaling(ctx);
+    
+    scale = GetNuklearScaling(ctx);
 
     nk_foreach(cmd, ctx) {
         switch (cmd->type) {
@@ -662,8 +671,8 @@ DrawNuklear(struct nk_context * ctx)
             } break;
 
             case NK_COMMAND_CUSTOM: {
-                TraceLog(LOG_WARNING, "NUKLEAR: Unverified custom callback implementation NK_COMMAND_CUSTOM");
                 const struct nk_command_custom *custom = (const struct nk_command_custom *)cmd;
+                TraceLog(LOG_WARNING, "NUKLEAR: Unverified custom callback implementation NK_COMMAND_CUSTOM");
                 custom->callback(NULL, (short)(custom->x * scale), (short)(custom->y * scale), (unsigned short)(custom->w * scale), (unsigned short)(custom->h * scale), custom->callback_data);
             } break;
 
@@ -747,9 +756,11 @@ nk_raylib_input_keyboard(struct nk_context * ctx)
     if (IsKeyPressed(KEY_TAB)) nk_input_unicode(ctx, 9);
 
     // Unicode
-    int code;
-    while ((code = GetCharPressed()) != 0)
-        nk_input_unicode(ctx, (nk_rune)code);
+    {
+        int code;
+        while ((code = GetCharPressed()) != 0)
+            nk_input_unicode(ctx, (nk_rune)code);
+    }
 }
 
 /**
@@ -765,6 +776,7 @@ nk_raylib_input_mouse(struct nk_context * ctx)
     const float scale = GetNuklearScaling(ctx);
     const int mouseX = (int)((float)GetMouseX() / scale);
     const int mouseY = (int)((float)GetMouseY() / scale);
+    float mouseWheel;
 
     nk_input_motion(ctx, mouseX, mouseY);
     nk_input_button(ctx, NK_BUTTON_LEFT, mouseX, mouseY, IsMouseButtonDown(MOUSE_LEFT_BUTTON));
@@ -772,7 +784,7 @@ nk_raylib_input_mouse(struct nk_context * ctx)
     nk_input_button(ctx, NK_BUTTON_MIDDLE, mouseX, mouseY, IsMouseButtonDown(MOUSE_MIDDLE_BUTTON));
 
     // Mouse Wheel
-    float mouseWheel = GetMouseWheelMove();
+    mouseWheel = GetMouseWheelMove();
     if (mouseWheel != 0.0f) {
         struct nk_vec2 mouseWheelMove;
         mouseWheelMove.x = 0.0f;
@@ -976,6 +988,7 @@ CleanupNuklearImage(struct nk_image img)
 NK_API void
 SetNuklearScaling(struct nk_context * ctx, float scaling)
 {
+    struct NuklearUserData* userData;
     if (ctx == NULL) {
         return;
     }
@@ -985,7 +998,7 @@ SetNuklearScaling(struct nk_context * ctx, float scaling)
         return;
     }
 
-    struct NuklearUserData* userData = (struct NuklearUserData*)ctx->userdata.ptr;
+    userData = (struct NuklearUserData*)ctx->userdata.ptr;
     if (userData != NULL) {
         userData->scaling = scaling;
     }
@@ -999,11 +1012,12 @@ SetNuklearScaling(struct nk_context * ctx, float scaling)
 NK_API float
 GetNuklearScaling(struct nk_context * ctx)
 {
+    struct NuklearUserData* userData;
     if (ctx == NULL) {
         return 1.0f;
     }
 
-    struct NuklearUserData* userData = (struct NuklearUserData*)ctx->userdata.ptr;
+    userData = (struct NuklearUserData*)ctx->userdata.ptr;
     if (userData != NULL) {
         return userData->scaling;
     }

@@ -1,7 +1,8 @@
 CC= gcc
 STD= c99
-CFLAGS= -Wall -Wextra -Wpedantic -std=$(STD) -g -I3rdparty -I3rdparty/raylib -fsanitize=undefined,address
-LDFLAGS=
+WARNFLAGS= -Wall -Wextra -Wpedantic -Wdeclaration-after-statement
+CFLAGS= $(WARNFLAGS) --std=$(STD) -g -I3rdparty -fsanitize=undefined 
+LDFLAGS= -lm
 OUT= main
 SQLITEOBJ= 3rdparty/sqlite/sqlite3.o
 SRC= main.c
@@ -16,8 +17,8 @@ all: main
 $(LIBRAYLIB):
 	cd 3rdparty/raylib && PLATFORM=PLATFORM_DESKTOP_GLFW make -j
 
-$(SQLITEOBJ): 3rdparty/sqlite/sqlite3.c Makefile
-	$(CC) $(CFLAGS) -c 3rdparty/sqlite/sqlite3.c -o $(SQLITEOBJ)
+$(SQLITEOBJ): 3rdparty/sqlite/sqlite3.c
+	$(CC) -g -O3 -c 3rdparty/sqlite/sqlite3.c -o $(SQLITEOBJ)
 
 $(OUT): $(SRC) $(SQLITEOBJ) Makefile $(LIBRAYLIB)
 	$(CC) $(CFLAGS) $(SRC) $(SQLITEOBJ) $(LIBRAYLIB) -o $(OUT) $(LDFLAGS)
@@ -31,6 +32,7 @@ clean:
 	if [ -e main.db ]; then trash main.db; fi
 	if [ -e a.out ]; then trash a.out; fi
 	if [ -e $(SQLITEOBJ) ]; then trash $(SQLITEOBJ); fi
+	if [ -e build ]; then trash build; fi
 	cd 3rdparty/raylib/ && make clean
 
 

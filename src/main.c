@@ -1,3 +1,4 @@
+/* stdlib */
 #include <unistd.h>
 
 /* 3rdparty */
@@ -5,144 +6,30 @@
 #include <sqlite/sqlite3.h>
 #define CORE_IMPLEMENTATION
 #include <core.h/core.h>
-//#define NK_INCLUDE_FIXED_TYPES
-//#define NK_INCLUDE_STANDARD_IO
-#define NK_INCLUDE_STANDARD_VARARGS
-//#define NK_INCLUDE_DEFAULT_ALLOCATOR
-//#define NK_INCLUDE_VERTEX_BUFFER_OUTPUT
-//#define NK_INCLUDE_FONT_BAKING
-//#define NK_INCLUDE_DEFAULT_FONT
+#define NK_INCLUDE_DEFAULT_FONT
 #define RAYLIB_NUKLEAR_IMPLEMENTATION
 #define RAYLIB_NUKLEAR_INCLUDE_DEFAULT_FONT
 #include <raylib-nuklear/raylib-nuklear.h>
+#include <nuklear/style.c>
 
-#define database_create_script_path "./database_create.sql"
-
-core_Bool database_create(const char * path, sqlite3 ** result) {
-    if(access(path, F_OK) == 0) {
-        fprintf(stderr, "File already exists\n");
-        return CORE_FALSE;
-    } else {
-        int err = sqlite3_open(path, result);
-        if(err != 0) {
-            fprintf(stderr, "Failed to open db\n");
-            sqlite3_close(*result);
-            return CORE_FALSE;
-        } else {
-            core_Arena arena = {0};
-            FILE * fp = fopen(database_create_script_path, "r");
-            char * buf = core_file_read_all_arena(&arena, fp);
-            fclose(fp);
-            char * exec_err = NULL;
-            printf("%s", buf);
-            if(sqlite3_exec(*result, buf, NULL, NULL, &exec_err) != 0) {
-                fprintf(stderr, "sql execution failed: %s\n", exec_err);
-                core_arena_free(&arena);
-                sqlite3_close(*result);
-                return CORE_FALSE;
-            }
-            core_arena_free(&arena);
-            return CORE_TRUE;
-        }
-    }
+core_Bool db_exec_sql_file(sqlite3 * db, const char * sql_file_path) {
+    core_Arena arena = {0};
+    char * exec_err = NULL;
+    FILE * fp = fopen(sql_file_path, "r");
+    char * buf;
+    core_Bool success = CORE_TRUE;
+    if(!fp) return CORE_FALSE;
+    buf = core_file_read_all_arena(&arena, fp);
+    fclose(fp);
+    if(sqlite3_exec(db, buf, NULL, NULL, &exec_err) != 0) success = CORE_FALSE;
+    core_arena_free(&arena);
+    return success;
 }
 
 typedef enum {
     MENU_TAG_NEW_ITEM,
     MENU_TAG_VIEW_TABLES
 } MenuTag;
-
-void db_iterate_table(sqlite3 * db, const char * table_name) {
-    sqlite3_stmt * stmt;
-    char sql[256];
-    const char * unused;
-    int code;
-    sqlite3_snprintf(sizeof(sql), sql, "pragma table_info(%s);", table_name);
-    
-    if((code = sqlite3_prepare_v2(db, sql, -1, &stmt, &unused)) != SQLITE_OK) {
-        fprintf(stderr, "\n%s\n", sqlite3_errstr(code));
-        CORE_FATAL_ERROR("Failed to prepare statement");
-    }
-
-    while((code = sqlite3_step(stmt)) == SQLITE_ROW) {
-        int col;
-        int count = sqlite3_column_count(stmt);
-        for(col = 0; col < count; ++col) {
-            int type = sqlite3_column_type(stmt, col);
-            switch(type) {
-            case SQLITE_INTEGER:
-                printf("%d,", sqlite3_column_int(stmt, col));
-                break;
-            case SQLITE_FLOAT:
-                printf("%lf,", sqlite3_column_double(stmt, col));
-                break;
-            case SQLITE_TEXT:
-                printf("%s,", sqlite3_column_text(stmt, col));
-                break;
-            case SQLITE_BLOB: {
-                int bytes = sqlite3_column_bytes(stmt, col);
-                (void)bytes;
-                printf("%p,", sqlite3_column_blob(stmt, col));
-            } break;
-            case SQLITE_NULL:
-                printf("NULL,");
-                break;
-            }
-        }
-        printf("\n");
-    }
-    if(code != SQLITE_DONE) {
-        CORE_FATAL_ERROR("step returned error");
-    }
-    sqlite3_finalize(stmt);
-}
-
-sqlite3_stmt * db_table_info(sqlite3 * db, const char * table_name) {
-    sqlite3_stmt * stmt;
-    char sql[256];
-    const char * unused;
-    int code;
-    sqlite3_snprintf(sizeof(sql), sql, "pragma table_info(%s);", table_name);
-    
-    if((code = sqlite3_prepare_v2(db, sql, -1, &stmt, &unused)) != SQLITE_OK) {
-        fprintf(stderr, "\n%s\n", sqlite3_errstr(code));
-        return NULL;
-    }
-    return stmt;
-}
-
-/*
-typedef struct {
-    const char * name;
-    int type;
-} db_TableMetadataEntry;
-
-typedef core_Vec(db_TableMetadataEntry) db_TableMetadata;
-
-core_Bool db_table_metadata(sqlite3 * db, core_Arena * a, const char * table_name, db_TableMetadata * out) {
-    sqlite3_stmt * stmt;
-    char sql[256];
-    const char * unused;
-    int code;
-    db_TableMetadata meta = {0};
-    (void)meta;
-    sqlite3_snprintf(sizeof(sql), sql, "pragma table_info(%s);", table_name);
-    
-    if((code = sqlite3_prepare_v2(db, sql, -1, &stmt, &unused)) != SQLITE_OK) {
-        fprintf(stderr, "\n%s\n", sqlite3_errstr(code));
-        return CORE_FALSE;
-    }
-
-    while((code = sqlite3_step(stmt)) == SQLITE_ROW) {
-        db_TableMetadataEntry entry = {0};
-        char * typestr = sqlite3_column_str(stmt, 2);
-        if(strcmp("TEXT", typestr) == 0) {
-            typestr = SQLITE_TEXT;
-        }
-        entry.name
-    }
-}
-*/
 
 typedef enum {
     DB_STATUS_PENDING,
@@ -196,36 +83,31 @@ db_Status db_customer_new(sqlite3 * db, struct nk_context * ctx) {
     return ret;
 }
 
-
+#define FILE_EXISTS(path) (access(path, F_OK) == 0)
 
 int main() {
     sqlite3 * db = NULL;
-    int err;
-    if(access("main.db", F_OK) != 0) {
-        if(!database_create("main.db", &db)) CORE_FATAL_ERROR("Failed to create database");
-    } else {
-        if((err = sqlite3_open("main.db", &db)) != SQLITE_OK) {
-            CORE_FATAL_ERROR(sqlite3_errstr(err));
-        }
-    }
-    db_iterate_table(db, "customers");
+    struct nk_context * ctx = NULL;
+    struct nk_colorf bg;
+    Font font;
+    bool fix_nuklear_sizing_bug = false; /*For some reason nuklear doesn't work on mac until the window is resized*/
+    bool init_database = false;
+    const char * db_path = ".main.db";
+
+    if(!FILE_EXISTS(db_path)) init_database = true;
+    if(sqlite3_open(db_path, &db) != SQLITE_OK) CORE_FATAL_ERROR("failed to open db");
+    if(init_database) db_exec_sql_file(db, "sql/db_init.sql");
+    /*db_iterate_table(db, "customers");*/
 
     SetConfigFlags(FLAG_WINDOW_RESIZABLE);
     InitWindow(1000, 750, "db");
 
-
-    struct nk_context * ctx = NULL;
-    struct nk_colorf bg;
     bg.r = 0.10f, bg.g = 0.18f, bg.b = 0.24f, bg.a = 1.0f;
-    Font font = LoadFontFromNuklear(20);
+    font = LoadFontFromNuklear(41);
     ctx = InitNuklearEx(font, 20);
-
-    bool fix_nuklear_sizing_bug = false;
-
+    nk_set_style(ctx, THEME_DRACULA);
 
     while(!WindowShouldClose()) {
-
-
         UpdateNuklear(ctx);
 
         if (nk_begin(ctx, "Demo", nk_rect(50, 50, 430, 650),
@@ -236,7 +118,6 @@ int main() {
             db_customer_new(db, ctx);
         }
         nk_end(ctx);
-
         
         BeginDrawing();
         {
@@ -254,7 +135,8 @@ int main() {
         }
 
     }
-    
+
+    UnloadNuklear(ctx);
     CloseWindow();
     sqlite3_close(db);
 }
