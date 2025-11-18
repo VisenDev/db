@@ -31,6 +31,8 @@ SOFTWARE.
 #include <ctype.h>
 #include <string.h>
 #include <limits.h>
+#include <time.h>
+
 
 /****  C STANDARD ****/
 #ifdef __STDC_VERSION
@@ -48,23 +50,42 @@ SOFTWARE.
 #endif /*__STDC_VERSION__*/
 
 
-/**** BOOL ****/
-typedef unsigned char core_Bool;
-#define CORE_TRUE 1
-#define CORE_FALSE 0
-
-#if !defined(CORE_C89)
-#    include <stdbool.h>
+/**** OPERATING SYSTEM ****/
+#if defined(__unix__)
+#    define CORE_UNIX
+#elif defined(_WIN32) || defined(WIN32)
+#    define CORE_WINDOWS
 #endif
 
+
+/**** COMPILER ****/
+#if defined(__clang__)
+#   define CORE_CLANG
+#elif defined(__GNUC__)
+#   define CORE_GCC
+#endif
+
+
+/**** BOOL ****/
+#if !defined(CORE_C89)
+    #include <stdbool.h>
+    typedef bool core_Bool;
+    #define CORE_TRUE true
+    #define CORE_FALSE false
+#else
+    typedef unsigned char core_Bool;
+    #define CORE_TRUE 1
+    #define CORE_FALSE 0
+#endif /*C89*/
+
 /**** ATTRIBUTES ****/
-#if defined(__clang__) || defined(__GNUC__)
+#if defined(CORE_CLANG) || defined(CORE_GCC)
 #   define CORE_NORETURN __attribute__((noreturn))
 #   define CORE_NODISCARD __attribute__((warn_unused_result))
 #else
 #   define CORE_NORETURN
 #   define CORE_NODISCARD
-#endif /*__clang__ || __GNUC__*/
+#endif /* CLANG GCC */
 
 
 /**** ANSI ****/
@@ -794,4 +815,46 @@ void core_untypedhashmap_free(core_UntypedHashmap * self)
 
 #define core_hashmap_free(self) core_untypedhashmap_free(&(self)->backing)
 
+
+/**** STAT ****/
+typedef time_t core_Time;
+core_Time core_file_modified_timestamp(const char * path);
+
+#ifdef CORE_IMPLEMENTATION
+
+#if defined(CORE_UNIX)
+    #include <sys/stat.h>
+    core_Time core_file_modified_timestamp(const char * path) {
+        struct stat st;
+        if(stat(path, &st) != 0) return -1;
+        return st.st_mtime;
+    }
+#elif defined(CORE_WINDOWS)
+    #include <sys/stat.h>
+    #include <fcntl.h>
+    #include <io.h>
+    core_Time core_file_modified_timestamp(const char * path) {
+        int fd = _open(path, _O_RDONLY);
+        struct _stat st;
+        if(_fstat(fd, &st) != 0) return -1;
+        return st.st_mtime;
+    }
+#endif
+
+#endif /*CORE_IMPLEMENTATION*/
+
+/**** ACCESS ****/
+#if defined(CORE_UNIX)
+#include <unistd.h>
+core_Bool core_file_exists(const char * path)
+#ifdef CORE_IMPLEMENTATION
+{
+    return (access(path, F_OK) == 0);
+}
+#else
+;
+#endif /*CORE_IMPLEMENTATION*/
+#endif /*CORE_UNIX*/
+
 #endif /*_CORE_H_*/
+

@@ -36,7 +36,16 @@ typedef enum {
     DB_STATUS_DONE
 } db_Status;
 
-db_Status db_customer_new(sqlite3 * db, struct nk_context * ctx) {
+
+typedef struct {
+    core_Arena * arena;
+    sqlite3 * db;
+    struct nk_context * ctx;
+} db_State;
+
+
+db_Status db_customer_new(db_State * s) {
+
     static char name[256];
     static int name_len = 0;
     static char email[256];
@@ -44,26 +53,29 @@ db_Status db_customer_new(sqlite3 * db, struct nk_context * ctx) {
     static char city[256];
     static int city_len = 0;
     db_Status ret = DB_STATUS_DONE;
-    if(nk_group_begin(ctx, "New Customer", 0)) {
-        nk_layout_row_dynamic(ctx, 25, 2);
+    if (nk_begin(s->ctx, "Add New Customer", nk_rect(50, 50, 430, 650),
+                 NK_WINDOW_BORDER|NK_WINDOW_MOVABLE|NK_WINDOW_SCALABLE|
+                 NK_WINDOW_MINIMIZABLE|NK_WINDOW_TITLE
+        )) {
+        nk_layout_row_dynamic(s->ctx, 25, 2);
     
-        nk_label(ctx, "Customer Name: ", NK_TEXT_RIGHT);
-        nk_edit_string(ctx, NK_EDIT_FIELD, name, &name_len, sizeof(name), NULL);
+        nk_label(s->ctx, "Customer Name: ", NK_TEXT_RIGHT);
+        nk_edit_string(s->ctx, NK_EDIT_FIELD, name, &name_len, sizeof(name), NULL);
 
-        nk_label(ctx, "Customer Email: ", NK_TEXT_RIGHT);
-        nk_edit_string(ctx, NK_EDIT_FIELD, email, &email_len, sizeof(email), NULL);
+        nk_label(s->ctx, "Customer Email: ", NK_TEXT_RIGHT);
+        nk_edit_string(s->ctx, NK_EDIT_FIELD, email, &email_len, sizeof(email), NULL);
 
-        nk_label(ctx, "Customer City: ", NK_TEXT_RIGHT);
-        nk_edit_string(ctx, NK_EDIT_FIELD, city, &city_len, sizeof(city), NULL);
+        nk_label(s->ctx, "Customer City: ", NK_TEXT_RIGHT);
+        nk_edit_string(s->ctx, NK_EDIT_FIELD, city, &city_len, sizeof(city), NULL);
 
-        if(nk_button_label(ctx, "Save")) {
+        if(nk_button_label(s->ctx, "Save")) {
             int err;
             sqlite3_stmt * stmt;
             const char sql[] = "insert into customers(name, email, city) values(?, ?, ?);";
-            err = sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
+            err = sqlite3_prepare_v2(s->db, sql, -1, &stmt, NULL);
             if(err != SQLITE_OK) {
                 fprintf(stderr, "\n%s\n", sqlite3_errstr(err));
-                fprintf(stderr, "\n%s\n", sqlite3_errmsg(db));
+                fprintf(stderr, "\n%s\n", sqlite3_errmsg(s->db));
                 CORE_TODO("Add an error handling popup");
             }
             sqlite3_bind_text(stmt, 1, name, name_len, SQLITE_TRANSIENT);
@@ -79,64 +91,81 @@ db_Status db_customer_new(sqlite3 * db, struct nk_context * ctx) {
         }
         
     }
-    nk_group_end(ctx);
+    nk_end(s->ctx);
     return ret;
 }
 
-#define FILE_EXISTS(path) (access(path, F_OK) == 0)
-
-int main() {
-    sqlite3 * db = NULL;
-    struct nk_context * ctx = NULL;
-    struct nk_colorf bg;
-    Font font;
-    bool fix_nuklear_sizing_bug = false; /*For some reason nuklear doesn't work on mac until the window is resized*/
+void db_application_init(db_State ** out) {
     bool init_database = false;
     const char * db_path = ".main.db";
+    Font font;
+    db_State * s;
 
-    if(!FILE_EXISTS(db_path)) init_database = true;
-    if(sqlite3_open(db_path, &db) != SQLITE_OK) CORE_FATAL_ERROR("failed to open db");
-    if(init_database) db_exec_sql_file(db, "sql/db_init.sql");
-    /*db_iterate_table(db, "customers");*/
+    *out = malloc(sizeof(db_State));
+    assert(*out != NULL);
+    s = *out;
+
+    s->arena = malloc(sizeof(core_Arena));
+    memset(s->arena, 0, sizeof(core_Arena));
+
+    if(!core_file_exists(db_path)) init_database = true;
+    if(sqlite3_open(db_path, &s->db) != SQLITE_OK) CORE_FATAL_ERROR("failed to open db");
+    if(init_database) db_exec_sql_file(s->db, "sql/db_init.sql");
 
     SetConfigFlags(FLAG_WINDOW_RESIZABLE);
     InitWindow(1000, 750, "db");
 
-    bg.r = 0.10f, bg.g = 0.18f, bg.b = 0.24f, bg.a = 1.0f;
     font = LoadFontFromNuklear(41);
-    ctx = InitNuklearEx(font, 20);
-    nk_set_style(ctx, THEME_DRACULA);
+    s->ctx = InitNuklearEx(font, 20);
+    nk_set_style(s->ctx, THEME_DRACULA);
+}
 
-    while(!WindowShouldClose()) {
-        UpdateNuklear(ctx);
+void db_application_deinit(db_State ** state) {
+    db_State * s = *state;
+    UnloadNuklear(s->ctx);
+    CloseWindow();
+    sqlite3_close(s->db);
+    core_arena_free(s->arena);
+    free(s);
+    *state = NULL;
+}
 
-        if (nk_begin(ctx, "Demo", nk_rect(50, 50, 430, 650),
-            NK_WINDOW_BORDER|NK_WINDOW_MOVABLE|NK_WINDOW_SCALABLE|
-                     NK_WINDOW_MINIMIZABLE|NK_WINDOW_TITLE
-            )) {
-            nk_layout_row_dynamic(ctx, 200, 1);
-            db_customer_new(db, ctx);
-        }
-        nk_end(ctx);
-        
-        BeginDrawing();
-        {
-            ClearBackground(ColorFromNuklearF(bg));
-            
-            DrawNuklear(ctx);
-        }
-        EndDrawing();
+void db_application_frame_begin(db_State * s) {
+    UpdateNuklear(s->ctx);
+}
 
-        if(!fix_nuklear_sizing_bug) {
-            int sw = GetScreenWidth(), sh = GetScreenHeight();
-            SetWindowSize(sw-1, sh);    /* tiny change */
-            SetWindowSize(sw, sh);      /* back to original */
-            fix_nuklear_sizing_bug = true;
-        }
+void db_application_frame_end(db_State * s) {
+    static core_Bool fix_nuklear_sizing_bug = CORE_TRUE; /*For some reason nuklear doesn't work on mac until the window is resized*/
+    BeginDrawing();
+    {
+        ClearBackground(ColorFromNuklear(s->ctx->style.window.background));
+        DrawNuklear(s->ctx);
+    }
+    EndDrawing();
 
+    if(fix_nuklear_sizing_bug) {
+        int sw = GetScreenWidth(), sh = GetScreenHeight();
+        SetWindowSize(sw-1, sh);    /* tiny change */
+        SetWindowSize(sw, sh);      /* back to original */
+        fix_nuklear_sizing_bug = CORE_FALSE;
+    }
+}
+
+core_Bool db_application_should_close(db_State * s) {
+    (void)s;
+    return WindowShouldClose();
+}
+
+int main() {
+    db_State * s;
+    db_application_init(&s);
+ 
+    while(!db_application_should_close(s)) {
+        db_application_frame_begin(s);
+        db_customer_new(s);
+        db_application_frame_end(s);
     }
 
-    UnloadNuklear(ctx);
-    CloseWindow();
-    sqlite3_close(db);
+    db_application_deinit(&s);
+    core_exit(0);
 }

@@ -1,7 +1,7 @@
-CC= gcc
+CC ?= gcc
 STD= c99
 WARNFLAGS= -Wall -Wextra -Wpedantic -Wdeclaration-after-statement
-CFLAGS= $(WARNFLAGS) --std=$(STD) -g -I3rdparty -fsanitize=undefined 
+CFLAGS= $(WARNFLAGS) -std=$(STD) -g -I3rdparty -fsanitize=undefined 
 LDFLAGS= -lm
 OUT= main
 SQLITEOBJ= 3rdparty/sqlite/sqlite3.o
@@ -14,11 +14,11 @@ endif
 
 all: main
 
-$(LIBRAYLIB):
-	cd 3rdparty/raylib && PLATFORM=PLATFORM_DESKTOP_GLFW make -j
+$(LIBRAYLIB): Makefile
+	cd 3rdparty/raylib && CC=$(CC) PLATFORM=PLATFORM_DESKTOP_GLFW make -j
 
-$(SQLITEOBJ): 3rdparty/sqlite/sqlite3.c
-	$(CC) -g -O3 -c 3rdparty/sqlite/sqlite3.c -o $(SQLITEOBJ)
+$(SQLITEOBJ): 3rdparty/sqlite/sqlite3.c Makefile
+	$(CC) -g -c 3rdparty/sqlite/sqlite3.c -o $(SQLITEOBJ)
 
 $(OUT): $(SRC) $(SQLITEOBJ) Makefile $(LIBRAYLIB)
 	$(CC) $(CFLAGS) $(SRC) $(SQLITEOBJ) $(LIBRAYLIB) -o $(OUT) $(LDFLAGS)
@@ -39,5 +39,8 @@ clean:
 TAGS:
 	find . -name '*.[ch]' -type f -exec etags {} +
 
-.PHONY: main TAGS
+update_core.h:
+	cd 3rdparty/core.h/ && trash core.h && wget https://github.com/VisenDev/core.h/raw/refs/heads/master/core.h
+
+.PHONY: main TAGS update_core.h
 
