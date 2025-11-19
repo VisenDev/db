@@ -2,7 +2,7 @@
 #include "src/3rdparty/core.h/core.h"
 
 #if defined(CORE_UNIX)
-#   define CC "gcc "
+#   define CC "tcc "
 #elif defined(CORE_WINDOWS)
 #   define CC "cl.exe "
 #endif
@@ -92,22 +92,49 @@ void all(void) {
     if(system(cmd) != 0) CORE_FATAL_ERROR("Failed to build main");
 }
 
+const char * echo(const char * cmd) {
+    puts(cmd);
+    return cmd;
+}
+
+void clean_file(const char * path) {
+    if(core_file_modified_timestamp(path) <= 0) return;
+    printf("remove(\"%s\");\n", path);
+    if(remove(path) != 0) CORE_FATAL_ERROR("Failed to delete file");
+}
+
+void clean(void) {
+    unsigned long i;
+    clean_file("main");
+    clean_file(SQLITE_OBJ);
+    for(i = 0; i < CORE_ARRAY_LEN(raylib_obj); ++i) {
+        clean_file(raylib_obj[i]);
+    }
+}
 
 int main(int argc, char ** argv) {
     static const char * input[] = {"build.c"};
 
-    if(argc > 1) {
-        if(strcmp(argv[1], "clean") == 0) {
-            system("trash main");
-            system("trash build");
-            return 0;
-        }
-    }
-    
     if(core_file_needs_update(argv[0], input, CORE_ARRAY_LEN(input))) {
         CORE_FATAL_ERROR("build.c has changed, it needs to be recompiled");
     }
-    all();
+
+
+    if(argc == 1) {
+        all();
+    } else if(argc == 2) {
+        if(strcmp(argv[1], "clean") == 0) {
+            clean();
+        } else if(strcmp(argv[1], "run") == 0) {
+            all();
+            system("./main");
+        } else if(strcmp(argv[1], "all") == 0) {
+            all();
+        }
+    } else {
+        CORE_FATAL_ERROR("Expected 0 or 1 arguments");
+    }
+    
 
     return 0;
 }
