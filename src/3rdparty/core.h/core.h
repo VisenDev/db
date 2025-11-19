@@ -33,7 +33,6 @@ SOFTWARE.
 #include <limits.h>
 #include <time.h>
 
-
 /****  C STANDARD ****/
 #ifdef __STDC_VERSION
 #   if __STDC_VERSION >= 202311L
@@ -51,7 +50,7 @@ SOFTWARE.
 
 
 /**** OPERATING SYSTEM ****/
-#if defined(__unix__)
+#if defined(__unix__) || defined(__linux__) || defined(__APPLE__)
 #    define CORE_UNIX
 #elif defined(_WIN32) || defined(WIN32)
 #    define CORE_WINDOWS
@@ -63,6 +62,12 @@ SOFTWARE.
 #   define CORE_CLANG
 #elif defined(__GNUC__)
 #   define CORE_GCC
+#elif defined(_MSC_VER)
+#   define CORE_MSVC
+#elif defined(__TINYC__)
+#   define CORE_TCC
+#else
+#   pragma message "Unknown compiler"
 #endif
 
 
@@ -880,4 +885,3 @@ core_Bool core_file_exists(const char * path)
 #endif /*CORE_UNIX*/
 
 #endif /*_CORE_H_*/
-
