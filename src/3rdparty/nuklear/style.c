@@ -439,3 +439,23 @@ static void nk_set_style(struct nk_context *ctx, enum theme theme) {
     nk_style_default(ctx);
   }
 }
+
+void nk_style_select(struct nk_context * ctx) {
+    /* styles */
+    static const char* themes[] = {"Black", "White", "Red", "Blue", "Dark", "Dracula",
+      "Catppucin Latte", "Catppucin Frappe", "Catppucin Macchiato", "Catppucin Mocha"};
+    static int current_theme = 0;
+
+    /* style selector */
+    nk_layout_row_dynamic(ctx, 0, 2);
+    {
+        int new_theme;
+        nk_label(ctx, "Style:", NK_TEXT_LEFT);
+        new_theme = nk_combo(ctx, themes, NK_LEN(themes), current_theme, 25, nk_vec2(200, 200));
+        if (new_theme != current_theme) {
+            current_theme = new_theme;
+            nk_set_style(ctx, current_theme);
+        }
+    }
+
+}

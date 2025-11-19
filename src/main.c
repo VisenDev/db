@@ -12,19 +12,6 @@
 #include <raylib-nuklear/raylib-nuklear.h>
 #include <nuklear/style.c>
 
-core_Bool db_exec_sql_file(sqlite3 * db, const char * sql_file_path) {
-    core_Arena arena = {0};
-    char * exec_err = NULL;
-    FILE * fp = fopen(sql_file_path, "r");
-    char * buf;
-    core_Bool success = CORE_TRUE;
-    if(!fp) return CORE_FALSE;
-    buf = core_file_read_all_arena(&arena, fp);
-    fclose(fp);
-    if(sqlite3_exec(db, buf, NULL, NULL, &exec_err) != 0) success = CORE_FALSE;
-    core_arena_free(&arena);
-    return success;
-}
 
 typedef enum {
     DB_MENU_TAB_HOME,
@@ -45,6 +32,22 @@ typedef struct {
     struct nk_context * ctx;
 } db_State;
 
+/*local*/
+#include "ui.c"
+
+core_Bool db_exec_sql_file(sqlite3 * db, const char * sql_file_path) {
+    core_Arena arena = {0};
+    char * exec_err = NULL;
+    FILE * fp = fopen(sql_file_path, "r");
+    char * buf;
+    core_Bool success = CORE_TRUE;
+    if(!fp) return CORE_FALSE;
+    buf = core_file_read_all_arena(&arena, fp);
+    fclose(fp);
+    if(sqlite3_exec(db, buf, NULL, NULL, &exec_err) != 0) success = CORE_FALSE;
+    core_arena_free(&arena);
+    return success;
+}
 
 db_Status db_customer_new(db_State * s) {
 
@@ -138,9 +141,12 @@ void db_application_run(db_State *s) {
     switch(s->menu_tab) {
     case DB_MENU_TAB_HOME: {
         nk_label(s->ctx, "Welcome to db!", NK_TEXT_RIGHT);
+        nk_style_select(s->ctx);
     } break;
     case DB_MENU_TAB_OPEN_ORDERS: {
+        static db_Address addr = {0};
         nk_label(s->ctx, "<in development, this page will show open orders>", NK_TEXT_RIGHT);
+        db_ui_address(s, &addr);
     } break;
     case DB_MENU_TAB_CUSTOMERS: {
         nk_layout_row_template_begin(s->ctx, 500);
@@ -186,7 +192,7 @@ void db_application_init(db_State ** out) {
 
     font = LoadFontFromNuklear(41);
     s->ctx = InitNuklearEx(font, 20);
-    nk_set_style(s->ctx, THEME_DRACULA);
+    /*    nk_set_style(s->ctx, THEME_WHITE); */
 }
 
 void db_application_deinit(db_State ** state) {
