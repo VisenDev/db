@@ -12,7 +12,6 @@ BEGIN TRANSACTION;
 CREATE TABLE customers (
     id              INTEGER PRIMARY KEY AUTOINCREMENT, -- internal unique id for each customer
     name            TEXT NOT NULL,                     -- company or customer name (required)
-    tax_id          TEXT,                              -- optional tax or VAT id
     address_line1   TEXT,                              -- street address (line 1)
     address_line2   TEXT,                              -- street address (line 2, optional)
     city            TEXT,

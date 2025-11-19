@@ -45,6 +45,46 @@ typedef struct {
     struct nk_context * ctx;
 } db_State;
 
+typedef struct {
+    const char * name;
+    const char * address_line1;
+    const char * address_line2;
+    const char * city;
+    const char * state;
+    const char * postal_code;
+    const char * country;
+    const char * phone;
+    const char * email;
+    const char * website;
+    const char * primary_contact_name;
+    const char * primary_contact_phone;
+    const char * primary_contact_email;
+    const char * notes;
+} db_Customer;
+
+#define DB_CUSTOMER_FOREACH(FN) \
+    FN(name                 )   \
+    FN(address_line1        )   \
+    FN(address_line2        )   \
+    FN(city                 )   \
+    FN(state                )   \
+    FN(postal_code          )   \
+    FN(country              )   \
+    FN(phone                )   \
+    FN(email                )   \
+    FN(website              )   \
+    FN(primary_contact_name )   \
+    FN(primary_contact_phone)   \
+    FN(primary_contact_email)   \
+    FN(notes                )               
+
+#define DECLARE_STRING(x) const char * x;
+
+typedef struct {
+    DB_CUSTOMER_FOREACH(DECLARE_STRING)
+} db_Customer;
+
+void db_customer_write_row(db_State * s, 
 
 db_Status db_customer_new(db_State * s) {
 
@@ -123,7 +163,6 @@ void db_menu_tab_button(db_State * s, const char * label, db_MenuTab menu_tab) {
         nk_style_pop_style_item(s->ctx);
     }
 }
-
 
 void db_application_run(db_State *s) {
 
@@ -225,8 +264,6 @@ core_Bool db_application_should_close(db_State * s) {
     return WindowShouldClose();
 }
 
-
-
 int main() {
     db_State * s;
     db_application_init(&s);
@@ -240,3 +277,4 @@ int main() {
     db_application_deinit(&s);
     core_exit(0);
 }
+
