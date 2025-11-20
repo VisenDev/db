@@ -183,7 +183,10 @@ void db_application_init(db_State ** out) {
     s->arena = malloc(sizeof(core_Arena));
     memset(s->arena, 0, sizeof(core_Arena));
 
+    #if 0
+    /* TODO: fix this on windows */
     if(!core_file_exists(db_path)) init_database = true;
+    #endif
     if(sqlite3_open(db_path, &s->db) != SQLITE_OK) CORE_FATAL_ERROR("failed to open db");
     if(init_database) db_exec_sql_file(s->db, "sql/db_init.sql");
 
@@ -233,7 +236,7 @@ core_Bool db_application_should_close(db_State * s) {
 
 
 
-int main() {
+int main(void) {
     db_State * s;
     db_application_init(&s);
  

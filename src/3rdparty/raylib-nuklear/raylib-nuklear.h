@@ -36,7 +36,7 @@
 #ifndef RAYLIB_NUKLEAR_H
 #define RAYLIB_NUKLEAR_H
 
-#include "raylib.h"
+#include <raylib/raylib.h>
 
 // Nuklear defines
 #define NK_INCLUDE_FIXED_TYPES
