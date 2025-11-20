@@ -1,6 +1,7 @@
 #define CORE_IMPLEMENTATION
 #include "src/3rdparty/core.h/core.h"
 
+
 #if defined(CORE_UNIX)
 #   define CC "cc "
 #elif defined(CORE_WINDOWS)
@@ -64,10 +65,16 @@ void libraylib(void) {
             #ifdef __linux__
                 core_strfmt(cmd, sizeof(cmd), &fill, "-D_GLFW_WAYLAND -D_GLFW_X11 ");
             #endif /*__linux__*/
+                
+            #ifdef __APPLE__
+                core_strfmt(cmd, sizeof(cmd), &fill, "-x objective-c ");
+            #endif /*__APPLE__*/
+
             core_strfmt(cmd, sizeof(cmd), &fill, "-DPLATFORM_DESKTOP_GLFW ");
             core_strfmt(cmd, sizeof(cmd), &fill, raylib_src[i]);
             core_strfmt(cmd, sizeof(cmd), &fill, " -o ");
             core_strfmt(cmd, sizeof(cmd), &fill, raylib_obj[i]);
+
             puts(cmd);
             if(system(cmd) != 0) CORE_FATAL_ERROR("Failed to compile raylib file");
         } else {
@@ -93,7 +100,11 @@ void all(void) {
         core_strfmt(cmd, sizeof(cmd), &fill, raylib_obj[i]);
     }
     core_strfmt(cmd, sizeof(cmd), &fill, " -o main");
-    core_strfmt(cmd, sizeof(cmd), &fill, " -lm");
+    core_strfmt(cmd, sizeof(cmd), &fill, " -lm ");
+#   ifdef __APPLE__
+    core_strfmt(cmd, sizeof(cmd), &fill, "-lobjc -framework CoreFoundation -framework WebKit -framework Cocoa -framework IOKit ");
+#   endif /*__APPLE__*/
+
     puts(cmd);
     if(system(cmd) != 0) CORE_FATAL_ERROR("Failed to build main");
 }
