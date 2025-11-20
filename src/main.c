@@ -193,8 +193,9 @@ void db_application_init(db_State ** out) {
     SetConfigFlags(FLAG_WINDOW_RESIZABLE);
     InitWindow(1000, 750, "db");
 
-    font = LoadFontFromNuklear(41);
-    s->ctx = InitNuklearEx(font, 20);
+    font = LoadFontFromNuklear(-1);
+    /* font = GetFontDefault(); */
+    s->ctx = InitNuklearEx(font, RAYLIB_NUKLEAR_DEFAULT_FONTSIZE * 2);
     /*    nk_set_style(s->ctx, THEME_WHITE); */
 }
 
