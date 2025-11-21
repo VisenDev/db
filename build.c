@@ -146,6 +146,7 @@ void clean_file(const char * path) {
 void clean(void) {
     unsigned long i;
     clean_file("main");
+    clean_file("main.pdb");
     clean_file(SQLITE_OBJ);
     for(i = 0; i < CORE_ARRAY_LEN(raylib_obj); ++i) {
         clean_file(raylib_obj[i]);
