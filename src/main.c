@@ -217,12 +217,16 @@ typedef struct {
     bool active;
 } db_EditString;
 
+
+#define ROUND_UP_TO_MULTIPLE(num, inc) \
+    (((num) + (inc) - 1) / (inc) * (inc))
+
 void db_ui_textbox(Rectangle bounds, const char * label, db_EditString * out) {
     int text_width = GuiGetTextWidth(label);
     Rectangle label_bounds = (Rectangle){
         .x = bounds.x,
         .y = bounds.y,
-        .width = text_width * 1.1,
+        .width = text_width + 2,
         .height = bounds.height
     };
     GuiLabel(label_bounds, label);
@@ -250,7 +254,7 @@ typedef struct {
 #define ROW_H 25
 #define PAD 10
 
-void db_ui_address(Rectangle bounds, db_Address * out) {
+int db_ui_address(Rectangle bounds, db_Address * out) {
     int i = 0;
     db_ui_textbox((Rectangle){bounds.x, bounds.y + (ROW_H + PAD) * i++, bounds.width, ROW_H}, "Street: ", &out->street);
 
@@ -259,13 +263,15 @@ void db_ui_address(Rectangle bounds, db_Address * out) {
 
     db_ui_textbox((Rectangle){bounds.x, bounds.y + (ROW_H + PAD) * i, bounds.width / 3 - PAD, ROW_H}, "State : ", &out->state);
     db_ui_textbox((Rectangle){bounds.x + bounds.width / 3 + PAD, bounds.y + (ROW_H + PAD) * i, bounds.width / 3 - PAD, ROW_H}, "Postal : ", &out->postal);
-    db_ui_textbox((Rectangle){bounds.x + (2 * (bounds.width / 3)) + PAD, bounds.y + (ROW_H + PAD) * i, bounds.width / 3 - PAD, ROW_H}, "Country : ", &out->country);
+    db_ui_textbox((Rectangle){bounds.x + (2 * (bounds.width / 3)) + PAD, bounds.y + (ROW_H + PAD) * i++, bounds.width / 3 - PAD, ROW_H}, "Country : ", &out->country);
+
+    return bounds.y + (ROW_H + PAD) * i;
 }
 
 int main(void) {
     db_State * s;
     db_application_init(&s);
-//    bool forceSquaredChecked = false;
+    bool forceSquaredChecked = false;
     db_Address address = {0};
     GuiLoadStyleDark();
 
@@ -274,8 +280,13 @@ int main(void) {
     {
         ClearBackground(GetColor(GuiGetStyle(DEFAULT, BACKGROUND_COLOR)));
         /* GuiPanel((Rectangle){ 320, 25, 225, 140 }, "Panel Info"); */
-        /* GuiCheckBox((Rectangle){ 25, 108, 15, 15 }, "FORCE CHECK!", &forceSquaredChecked); */
-        db_ui_address((Rectangle) {320, 25, 425, -1}, &address);
+        
+        int x = PAD;
+        int y = PAD;
+        y = db_ui_address((Rectangle) {x, y, 512, -1}, &address);
+        if(GuiButton((Rectangle){ x, y, 128, ROW_H }, "FORCE CHECK!")) {
+            
+        }
     }
     EndDrawing();
     }
