@@ -3,6 +3,8 @@
 
 /* 3rdparty */
 #include <raylib/raylib.h>
+#define RAYGUI_IMPLEMENTATION
+#include <raylib/raygui.h>
 #include <sqlite/sqlite3.h>
 #define CORE_IMPLEMENTATION
 #include <core.h/core.h>
