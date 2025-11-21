@@ -162,6 +162,10 @@ void update_core_h(void) {
     system(echo("wget https://github.com/VisenDev/core.h/raw/refs/heads/master/core.h --directory-prefix=src/3rdparty/core.h/"));
 }
 
+void tags(void) {
+    if(system(echo("find . -type f -name '*.[ch]' -exec etags {} +")) != 0) CORE_FATAL_ERROR("TAGS file generation failed");
+}
+
 void rebuild_build_c(int argc, char ** argv) {
     char buf[1024];
     unsigned long fill = 0;
@@ -227,6 +231,8 @@ int main(int argc, char ** argv) {
             all();
         } else if(strcmp(argv[1], "update_core.h") == 0) {
             update_core_h();
+        } else if(strcmp(argv[1], "tags") == 0 || strcmp(argv[1], "TAGS") == 0) {
+            tags();
         } else {
             CORE_FATAL_ERROR("Unknown argument, expected on of: clean run all update_core.h");
         }
