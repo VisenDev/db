@@ -36,7 +36,8 @@ void db_ui_edit_string(db_State * s, const char * label, db_EditString * out) {
 
 }
 
-void db_ui_address(db_State * s, db_Address * addr) {
+/
+int db_ui_address(db_State * s, db_Address * addr) {
     nk_layout_row_dynamic(s->ctx, s->ctx->style.font->height * 3 + s->ctx->style.window.padding.y * 19, 1);
     if(nk_group_begin_titled(s->ctx, "Address", "Address Information", NK_WINDOW_DYNAMIC)) {
 

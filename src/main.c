@@ -4,7 +4,9 @@
 /* 3rdparty */
 #include <raylib/raylib.h>
 #define RAYGUI_IMPLEMENTATION
-#include <raylib/raygui.h>
+#include <raygui/src/raygui.h>
+#include <raygui/examples/styles/style_jungle.h>
+#include <raygui/examples/styles/style_dark.h>
 #include <sqlite/sqlite3.h>
 #define CORE_IMPLEMENTATION
 #include <core.h/core.h>
@@ -33,9 +35,6 @@ typedef struct {
     db_MenuTab menu_tab;
     struct nk_context * ctx;
 } db_State;
-
-/*local*/
-#include "ui.c"
 
 core_Bool db_exec_sql_file(sqlite3 * db, const char * sql_file_path) {
     core_Arena arena = {0};
@@ -146,9 +145,9 @@ void db_application_run(db_State *s) {
         nk_style_select(s->ctx);
     } break;
     case DB_MENU_TAB_OPEN_ORDERS: {
-        static db_Address addr = {0};
-        nk_label(s->ctx, "<in development, this page will show open orders>", NK_TEXT_RIGHT);
-        db_ui_address(s, &addr);
+        /* static db_Address addr = {0}; */
+        /* nk_label(s->ctx, "<in development, this page will show open orders>", NK_TEXT_RIGHT); */
+        /* db_ui_address(s, &addr); */
     } break;
     case DB_MENU_TAB_CUSTOMERS: {
         nk_layout_row_template_begin(s->ctx, 500);
@@ -175,7 +174,6 @@ void db_application_run(db_State *s) {
 void db_application_init(db_State ** out) {
     bool init_database = false;
     const char * db_path = ".main.db";
-    Font font;
     db_State * s;
 
     *out = malloc(sizeof(db_State));
@@ -195,15 +193,14 @@ void db_application_init(db_State ** out) {
     SetConfigFlags(FLAG_WINDOW_RESIZABLE);
     InitWindow(1000, 750, "db");
 
-    font = LoadFontFromNuklear(-1);
+    /* font = LoadFontFromNuklear(-1); */
     /* font = GetFontDefault(); */
-    s->ctx = InitNuklearEx(font, RAYLIB_NUKLEAR_DEFAULT_FONTSIZE * 2);
+    //s->ctx = InitNuklearEx(font, RAYLIB_NUKLEAR_DEFAULT_FONTSIZE * 2);
     /*    nk_set_style(s->ctx, THEME_WHITE); */
 }
 
 void db_application_deinit(db_State ** state) {
     db_State * s = *state;
-    UnloadNuklear(s->ctx);
     CloseWindow();
     sqlite3_close(s->db);
     core_arena_free(s->arena);
@@ -211,42 +208,76 @@ void db_application_deinit(db_State ** state) {
     *state = NULL;
 }
 
-void db_application_frame_begin(db_State * s) {
-    UpdateNuklear(s->ctx);
-}
 
-void db_application_frame_end(db_State * s) {
-    static core_Bool fix_nuklear_sizing_bug = CORE_TRUE; /*For some reason nuklear doesn't work on mac until the window is resized*/
-    BeginDrawing();
-    {
-        ClearBackground(ColorFromNuklear(s->ctx->style.window.background));
-        DrawNuklear(s->ctx);
+#define EDIT_STRING_CAP 1024
+
+typedef struct {
+    char buf[EDIT_STRING_CAP];
+    int len;
+    bool active;
+} db_EditString;
+
+void db_ui_textbox(Rectangle bounds, const char * label, db_EditString * out) {
+    int text_width = GuiGetTextWidth(label);
+    Rectangle label_bounds = (Rectangle){
+        .x = bounds.x,
+        .y = bounds.y,
+        .width = text_width * 1.1,
+        .height = bounds.height
+    };
+    GuiLabel(label_bounds, label);
+    float pad = 2;
+    if (GuiTextBox(
+            (Rectangle){ bounds.x + label_bounds.width + 2, bounds.y, bounds.width - label_bounds.width - pad, bounds.height }, 
+            out->buf, 
+            EDIT_STRING_CAP,
+            out->active
+        )) {
+        out->active = !out->active;
     }
-    EndDrawing();
-
-    if(fix_nuklear_sizing_bug) {
-        int sw = GetScreenWidth(), sh = GetScreenHeight();
-        SetWindowSize(sw-1, sh);    /* tiny change */
-        SetWindowSize(sw, sh);      /* back to original */
-        fix_nuklear_sizing_bug = CORE_FALSE;
-    }
-}
-
-core_Bool db_application_should_close(db_State * s) {
-    (void)s;
-    return WindowShouldClose();
 }
 
 
+typedef struct {
+    db_EditString street;
+    db_EditString street_extra;
+    db_EditString city;
+    db_EditString state;
+    db_EditString postal;
+    db_EditString country;
+} db_Address;
+
+#define ROW_H 25
+#define PAD 10
+
+void db_ui_address(Rectangle bounds, db_Address * out) {
+    int i = 0;
+    db_ui_textbox((Rectangle){bounds.x, bounds.y + (ROW_H + PAD) * i++, bounds.width, ROW_H}, "Street: ", &out->street);
+
+    db_ui_textbox((Rectangle){bounds.x, bounds.y + (ROW_H + PAD) * i, bounds.width / 2 - PAD, ROW_H}, "PO/Apt #: ", &out->street_extra);
+    db_ui_textbox((Rectangle){bounds.x + bounds.width / 2 + PAD, bounds.y + (ROW_H + PAD) * i++, bounds.width / 2 - PAD, ROW_H}, "City : ", &out->city);
+
+    db_ui_textbox((Rectangle){bounds.x, bounds.y + (ROW_H + PAD) * i, bounds.width / 3 - PAD, ROW_H}, "State : ", &out->state);
+    db_ui_textbox((Rectangle){bounds.x + bounds.width / 3 + PAD, bounds.y + (ROW_H + PAD) * i, bounds.width / 3 - PAD, ROW_H}, "Postal : ", &out->postal);
+    db_ui_textbox((Rectangle){bounds.x + (2 * (bounds.width / 3)) + PAD, bounds.y + (ROW_H + PAD) * i, bounds.width / 3 - PAD, ROW_H}, "Country : ", &out->country);
+}
 
 int main(void) {
     db_State * s;
     db_application_init(&s);
- 
-    while(!db_application_should_close(s)) {
-        db_application_frame_begin(s);
-        db_application_run(s);
-        db_application_frame_end(s);
+//    bool forceSquaredChecked = false;
+    db_Address address = {0};
+    GuiLoadStyleDark();
+
+    while(!WindowShouldClose()) {
+    BeginDrawing();
+    {
+        ClearBackground(GetColor(GuiGetStyle(DEFAULT, BACKGROUND_COLOR)));
+        /* GuiPanel((Rectangle){ 320, 25, 225, 140 }, "Panel Info"); */
+        /* GuiCheckBox((Rectangle){ 25, 108, 15, 15 }, "FORCE CHECK!", &forceSquaredChecked); */
+        db_ui_address((Rectangle) {320, 25, 425, -1}, &address);
+    }
+    EndDrawing();
     }
 
     db_application_deinit(&s);

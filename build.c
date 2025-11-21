@@ -104,7 +104,7 @@ void libraylib(void) {
     }
 }
 
-void all(void) {
+void build_main(void) {
     char cmd[1024];
     unsigned long fill = 0;
     unsigned long i;
@@ -118,7 +118,7 @@ void all(void) {
     }
     core_strfmt(cmd, sizeof(cmd), &fill, " src/main.c ");
     core_strfmt(cmd, sizeof(cmd), &fill, "-Isrc/3rdparty/ ");
-    core_strfmt(cmd, sizeof(cmd), &fill, "-Wall -Wextra -Wpedantic -std=c99 -fsanitize=undefined ");
+    core_strfmt(cmd, sizeof(cmd), &fill, "-Wall -Wextra -Wpedantic -std=c99 -Wno-unused-parameter " /*"-fsanitize=undefined "*/);
     core_strfmt(cmd, sizeof(cmd), &fill, SQLITE_OBJ);
     for(i = 0; i < CORE_ARRAY_LEN(raylib_obj); ++i) {
         core_strfmt(cmd, sizeof(cmd), &fill, " ");
@@ -154,7 +154,7 @@ void clean(void) {
 }
 
 void run(void) {
-    all();
+    build_main();
     system("./main");
 }
 
@@ -221,20 +221,20 @@ int main(int argc, char ** argv) {
     }
 
     if(argc == 1) {
-        all();
+        run();
     } else if(argc == 2) {
         if(strcmp(argv[1], "clean") == 0) {
             clean();
         } else if(strcmp(argv[1], "run") == 0) {
             run();
-        } else if(strcmp(argv[1], "all") == 0) {
-            all();
+        } else if(strcmp(argv[1], "main") == 0) {
+            build_main();
         } else if(strcmp(argv[1], "update_core.h") == 0) {
             update_core_h();
         } else if(strcmp(argv[1], "tags") == 0 || strcmp(argv[1], "TAGS") == 0) {
             tags();
         } else {
-            CORE_FATAL_ERROR("Unknown argument, expected on of: clean run all update_core.h");
+            CORE_FATAL_ERROR("Unknown argument, expected on of: clean run build_main update_core.h");
         }
     } else {
         CORE_FATAL_ERROR("Expected 0 or 1 arguments");
