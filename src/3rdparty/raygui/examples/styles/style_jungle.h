@@ -531,7 +531,7 @@ static const GlyphInfo jungleFontGlyphs[189] = {
 };
 
 // Style loading function: Jungle
-static void GuiLoadStyleJungle(void)
+void GuiLoadStyleJungle(void)
 {
     // Load style properties provided
     // NOTE: Default properties are propagated

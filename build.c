@@ -5,16 +5,76 @@ typedef enum {
     OS_UNKNOWN,
     OS_MACOS,
     OS_LINUX,
-    OS_WINDOWS,
-} TargetOS;
+    OS_WINDOWS
+} OperatingSystem;
 
-TargetOS target_os = OS_UNKNOWN;
+/*Get target operating system*/
+OperatingSystem target(void) {
+    char * TARGET = getenv("TARGET");
+    char * target = getenv("target");
+    if(target || TARGET) {
+        char * t = target ? target : TARGET;
+        if(strcmp(t, "windows") == 0 || strcmp(t, "WINDOWS") == 0) {
+            return OS_WINDOWS;
+        } else if (strcmp(t, "macos") == 0 || strcmp(t, "MACOS") == 0) {
+            return OS_MACOS;
+        } else if (strcmp(t, "linux") == 0 || strcmp(t, "LINUX") == 0) {
+            return OS_LINUX;
+        } else {
+            CORE_FATAL_ERROR("Unknown target");
+        }
+    } else {
+#       if defined(_WIN32)
+            return OS_WINDOWS;
+#       elif defined(__APPLE__)
+            return OS_MACOS;
+#       elif defined(__linux__)
+            return OS_LINUX;
+#       else
+            return OS_UNKNOWN;
+#       endif
+    }
+}
 
-#if defined(CORE_UNIX)
-#   define CC "cc"
-#elif defined(CORE_WINDOWS)
-#   define CC "cl.exe"
-#endif
+/*Get appropriate C compiler name*/
+const char * cc(void) {
+    if(getenv("CC")) {
+        return getenv("CC");
+    }
+
+    #if 1
+        if(system("tcc -v") == 0) {
+            return "tcc";
+        }
+    #endif
+
+    #if defined(_WIN32)
+        return "cl.exe";
+    #elif defined(__APPLE__)
+        return "clang";
+    #elif defined(__linux__)
+        return "gcc";
+    #else
+        return "cc";
+    #endif
+}
+
+/*Get appropriate output executable name*/
+const char * out(void) {
+    if(target() != OS_UNKNOWN) {
+        if(target() == OS_WINDOWS) {
+            return "./main.exe";
+        } else {
+            return "./main";
+        }
+    } else {
+        #if defined(CORE_WINDOWS)
+            return "./main.exe";
+        #else
+            return "./main";
+        #endif
+    }
+}
 
 #define SQLITE_SRC "src/3rdparty/sqlite/sqlite3.c"
 #define SQLITE_OBJ "src/3rdparty/sqlite/sqlite3.o"
@@ -26,11 +86,7 @@ void sqlite_obj(void) {
     unsigned long fill = 0;
     static const char * deps[] = { SQLITE_SRC, "build.c" };
     if(core_file_needs_update(SQLITE_OBJ, deps, CORE_ARRAY_LEN(deps))) {
-        if(getenv("CC")) {
-            core_strfmt(cmd, sizeof(cmd), &fill, getenv("CC"));
-        } else {
-            core_strfmt(cmd, sizeof(cmd), &fill, CC);
-        }
+        core_strfmt(cmd, sizeof(cmd), &fill, cc());
         core_strfmt(cmd, sizeof(cmd), &fill, " -c " SQLITE_SRC " -o " SQLITE_OBJ);
         puts(cmd);
         if(system(cmd) != 0) CORE_FATAL_ERROR("Failed to build sqlite obj");
@@ -76,18 +132,15 @@ void libraylib(void) {
         deps[1] = "build.c";
         if(core_file_needs_update(raylib_obj[i], deps, CORE_ARRAY_LEN(deps))) {
             fill = 0;
-            if(getenv("CC")) {
-                core_strfmt(cmd, sizeof(cmd), &fill, getenv("CC"));
-            } else {
-                core_strfmt(cmd, sizeof(cmd), &fill, CC);
-            }
+
+            core_strfmt(cmd, sizeof(cmd), &fill, cc());
 
             core_strfmt(cmd, sizeof(cmd), &fill, " -c -I"RAYLIB_DIR"external/glfw/include -I"RAYLIB_DIR" ");
-            if(target_os == OS_LINUX) {
+            if(target() == OS_LINUX) {
                 core_strfmt(cmd, sizeof(cmd), &fill, "-D_GLFW_WAYLAND -D_GLFW_X11 ");
             }
                 
-            if(target_os == OS_MACOS) {
+            if(target() == OS_MACOS) {
                 core_strfmt(cmd, sizeof(cmd), &fill, "-x objective-c ");
             }
 
@@ -109,27 +162,45 @@ void build_main(void) {
     unsigned long fill = 0;
     unsigned long i;
 
+    /* static const char * deps[] = { */
+    /*     "src/main.c", */
+    /*     "build.c", */
+    /*     RAYLIB_DIR"raudio.o", */
+    /*     RAYLIB_DIR"rcore.o", */
+    /*     RAYLIB_DIR"rmodels.o", */
+    /*     RAYLIB_DIR"rshapes.o", */
+    /*     RAYLIB_DIR"rtext.o", */
+    /*     RAYLIB_DIR"rtextures.o", */
+    /*     RAYLIB_DIR"utils.o", */
+    /*     RAYLIB_DIR"rglfw.o", */
+    /*     SQLITE_OBJ */
+    /* }; */
+
+
+    /* if(!core_file_needs_update("main", deps, CORE_ARRAY_LEN(deps))) { */
+    /*     puts("\"main\" up to date!"); */
+    /*     return; */
+    /* } */
+
     sqlite_obj();
     libraylib();
-    if(getenv("CC")) {
-        core_strfmt(cmd, sizeof(cmd), &fill, getenv("CC"));
-    } else {
-        core_strfmt(cmd, sizeof(cmd), &fill, CC);
-    }
+
+    core_strfmt(cmd, sizeof(cmd), &fill, cc());
     core_strfmt(cmd, sizeof(cmd), &fill, " src/main.c ");
     core_strfmt(cmd, sizeof(cmd), &fill, "-Isrc/3rdparty/ ");
-    core_strfmt(cmd, sizeof(cmd), &fill, "-Wall -Wextra -Wpedantic -std=c99 -Wno-unused-parameter " /*"-fsanitize=undefined "*/);
+    core_strfmt(cmd, sizeof(cmd), &fill, "-Wall -Wextra -Wpedantic -std=c99 " /* "-fsanitize=undefined " */);
     core_strfmt(cmd, sizeof(cmd), &fill, SQLITE_OBJ);
     for(i = 0; i < CORE_ARRAY_LEN(raylib_obj); ++i) {
         core_strfmt(cmd, sizeof(cmd), &fill, " ");
         core_strfmt(cmd, sizeof(cmd), &fill, raylib_obj[i]);
     }
-    core_strfmt(cmd, sizeof(cmd), &fill, " -o main");
+    core_strfmt(cmd, sizeof(cmd), &fill, " -o ");
+    core_strfmt(cmd, sizeof(cmd), &fill, out());
     core_strfmt(cmd, sizeof(cmd), &fill, " -lm ");
-    if(target_os == OS_MACOS) {
+    if(target() == OS_MACOS) {
         core_strfmt(cmd, sizeof(cmd), &fill, "-lobjc -framework CoreFoundation -framework WebKit -framework Cocoa -framework IOKit ");
     }
-    if(target_os == OS_WINDOWS) {
+    if(target() == OS_WINDOWS) {
         core_strfmt(cmd, sizeof(cmd), &fill, "-lwinmm -lgdi32 ");
     }
 
@@ -146,7 +217,9 @@ void clean_file(const char * path) {
 void clean(void) {
     unsigned long i;
     clean_file("main");
+    clean_file("main.exe");
     clean_file("main.pdb");
+    clean_file("TAGS");
     clean_file(SQLITE_OBJ);
     for(i = 0; i < CORE_ARRAY_LEN(raylib_obj); ++i) {
         clean_file(raylib_obj[i]);
@@ -155,7 +228,7 @@ void clean(void) {
 
 void run(void) {
     build_main();
-    system("./main");
+    system(out());
 }
 
 void update_core_h(void) {
@@ -175,7 +248,7 @@ void rebuild_build_c(int argc, char ** argv) {
     if(rename(argv[0], ".old-build") != 0 ) CORE_FATAL_ERROR("Failed to rename old executable");
     fill = 0;
 
-    core_strfmt(buf, sizeof(buf), &fill, CC);
+    core_strfmt(buf, sizeof(buf), &fill, cc());
     core_strfmt(buf, sizeof(buf), &fill, " build.c -o ");
     core_strfmt(buf, sizeof(buf), &fill, argv[0]);
     
@@ -201,24 +274,6 @@ int main(int argc, char ** argv) {
         rebuild_build_c(argc, argv);
     }
 
-    if(getenv("TARGET")) {
-        const char * t = getenv("TARGET");
-        if(strcmp(t, "windows") == 0 || strcmp(t, "WINDOWS") == 0) {
-            target_os = OS_WINDOWS;
-        } else if (strcmp(t, "macos") == 0 || strcmp(t, "MACOS") == 0) {
-            target_os = OS_MACOS;
-        } else if (strcmp(t, "linux") == 0 || strcmp(t, "LINUX") == 0) {
-            target_os = OS_LINUX;
-        }
-    } else {
-#       if defined(_WIN32)
-            target_os = OS_WINDOWS;
-#       elif defined(__APPLE__)
-            target_os = OS_MACOS;
-#       elif defined(__linux__)
-            target_os = OS_LINUX;
-#       endif
-    }
 
     if(argc == 1) {
         run();

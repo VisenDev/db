@@ -215,77 +215,80 @@ typedef struct {
     char buf[EDIT_STRING_CAP];
     int len;
     bool active;
-} db_EditString;
+} ui_EditString;
 
-
-#define ROUND_UP_TO_MULTIPLE(num, inc) \
-    (((num) + (inc) - 1) / (inc) * (inc))
-
-void db_ui_textbox(Rectangle bounds, const char * label, db_EditString * out) {
-    int text_width = GuiGetTextWidth(label);
-    Rectangle label_bounds = (Rectangle){
-        .x = bounds.x,
-        .y = bounds.y,
-        .width = text_width + 2,
-        .height = bounds.height
-    };
-    GuiLabel(label_bounds, label);
-    float pad = 2;
-    if (GuiTextBox(
-            (Rectangle){ bounds.x + label_bounds.width + 2, bounds.y, bounds.width - label_bounds.width - pad, bounds.height }, 
-            out->buf, 
-            EDIT_STRING_CAP,
-            out->active
-        )) {
+void ui_textbox(Rectangle bounds, ui_EditString * out) {
+    if (GuiTextBox(bounds, out->buf, EDIT_STRING_CAP, out->active)) {
         out->active = !out->active;
     }
 }
 
-
 typedef struct {
-    db_EditString street;
-    db_EditString street_extra;
-    db_EditString city;
-    db_EditString state;
-    db_EditString postal;
-    db_EditString country;
-} db_Address;
+    ui_EditString street;
+    ui_EditString street_extra;
+    ui_EditString city;
+    ui_EditString state;
+    ui_EditString postal;
+    ui_EditString country;
+} ui_Address;
 
 #define ROW_H 25
 #define PAD 10
 
-int db_ui_address(Rectangle bounds, db_Address * out) {
-    int i = 0;
-    db_ui_textbox((Rectangle){bounds.x, bounds.y + (ROW_H + PAD) * i++, bounds.width, ROW_H}, "Street: ", &out->street);
+int ui_address(Rectangle bounds, ui_Address * out) {
+    assert(bounds.height == -1 && "The address widget has a fixed height");
 
-    db_ui_textbox((Rectangle){bounds.x, bounds.y + (ROW_H + PAD) * i, bounds.width / 2 - PAD, ROW_H}, "PO/Apt #: ", &out->street_extra);
-    db_ui_textbox((Rectangle){bounds.x + bounds.width / 2 + PAD, bounds.y + (ROW_H + PAD) * i++, bounds.width / 2 - PAD, ROW_H}, "City : ", &out->city);
+    const int x = bounds.x;
+    const int w = bounds.width;
+    const int h = ROW_H;
+    const int qw = w / 4; /*quarter width*/
 
-    db_ui_textbox((Rectangle){bounds.x, bounds.y + (ROW_H + PAD) * i, bounds.width / 3 - PAD, ROW_H}, "State : ", &out->state);
-    db_ui_textbox((Rectangle){bounds.x + bounds.width / 3 + PAD, bounds.y + (ROW_H + PAD) * i, bounds.width / 3 - PAD, ROW_H}, "Postal : ", &out->postal);
-    db_ui_textbox((Rectangle){bounds.x + (2 * (bounds.width / 3)) + PAD, bounds.y + (ROW_H + PAD) * i++, bounds.width / 3 - PAD, ROW_H}, "Country : ", &out->country);
+    int y = bounds.y;
 
-    return bounds.y + (ROW_H + PAD) * i;
+    GuiSetStyle(LABEL, TEXT_ALIGNMENT, TEXT_ALIGN_RIGHT);
+
+    GuiLabel((Rectangle){x, y, qw, h}, "Street:");
+    ui_textbox((Rectangle){x + qw, y, 3 * qw, h}, &out->street);
+    y += ROW_H + PAD;
+
+    GuiLabel((Rectangle){x, y, qw, h}, "PO/Apt #:");
+    ui_textbox((Rectangle){x + qw, y, qw, h}, &out->street_extra);
+    GuiLabel((Rectangle){x + 2 * qw, y, qw, h}, "City:");
+    ui_textbox((Rectangle){x + 3 * qw, y, qw, h}, &out->city);
+    y += ROW_H + PAD;
+
+    GuiLabel((Rectangle){x, y, qw, h}, "State:");
+    ui_textbox((Rectangle){x + qw, y, qw, h}, &out->state);
+    GuiLabel((Rectangle){x + 2 * qw, y, qw, h}, "Postal:");
+    ui_textbox((Rectangle){x + 3 * qw, y, qw, h}, &out->postal);
+    y += ROW_H + PAD;
+
+    GuiLabel((Rectangle){x, y, qw, h}, "Country:");
+    ui_textbox((Rectangle){x + qw, y, 3 * qw, h}, &out->country);
+    y += ROW_H + PAD;
+
+    return y;
 }
 
 int main(void) {
     db_State * s;
     db_application_init(&s);
-    bool forceSquaredChecked = false;
-    db_Address address = {0};
+    ui_Address address = {0};
     GuiLoadStyleDark();
 
     while(!WindowShouldClose()) {
     BeginDrawing();
     {
+        const int width = 512;
+        
         ClearBackground(GetColor(GuiGetStyle(DEFAULT, BACKGROUND_COLOR)));
-        /* GuiPanel((Rectangle){ 320, 25, 225, 140 }, "Panel Info"); */
+        GuiPanel((Rectangle){ 0, 0, width + PAD * 2, 210 }, "Address Information");
         
         int x = PAD;
-        int y = PAD;
-        y = db_ui_address((Rectangle) {x, y, 512, -1}, &address);
-        if(GuiButton((Rectangle){ x, y, 128, ROW_H }, "FORCE CHECK!")) {
-            
+        int y = PAD + ROW_H;
+        y = ui_address((Rectangle) {x, y, width, -1}, &address);
+        if(GuiButton((Rectangle){ x, y, width, ROW_H }, "Save")) {
+            printf("y: %d\n", y);
         }
     }
     EndDrawing();
