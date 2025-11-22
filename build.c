@@ -42,7 +42,7 @@ const char * cc(void) {
         return getenv("CC");
     }
 
-    #if 1
+    #if 0
         if(system("tcc -v") == 0) {
             return "tcc";
         }
