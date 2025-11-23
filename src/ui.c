@@ -1,3 +1,15 @@
+//#include "3rdparty/raygui/examples/styles/style_amber.h"
+#include "3rdparty/raygui/examples/styles/style_ashes.h"
+#include "3rdparty/raygui/examples/styles/style_bluish.h"  
+#include "3rdparty/raygui/examples/styles/style_candy.h"  
+#include "3rdparty/raygui/examples/styles/style_cherry.h"
+#include "3rdparty/raygui/examples/styles/style_cyber.h"
+#include "3rdparty/raygui/examples/styles/style_dark.h"
+#include "3rdparty/raygui/examples/styles/style_enefete.h" 
+#include "3rdparty/raygui/examples/styles/style_jungle.h"  
+#include "3rdparty/raygui/examples/styles/style_lavanda.h" 
+#include "3rdparty/raygui/examples/styles/style_sunny.h"   
+#include "3rdparty/raygui/examples/styles/style_terminal.h"
 
 #define EDIT_STRING_CAP 1024
 
