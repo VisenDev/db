@@ -4,55 +4,58 @@
 typedef struct {
     char buf[EDIT_STRING_CAP];
     int len;
-} db_EditString;
+    bool active;
+} ui_EditString;
+
+void ui_textbox(Rectangle bounds, ui_EditString * out) {
+    if (GuiTextBox(bounds, out->buf, EDIT_STRING_CAP, out->active)) {
+        out->active = !out->active;
+    }
+}
 
 typedef struct {
-    db_EditString street;
-    db_EditString street_extra;
-    db_EditString city;
-    db_EditString state;
-    db_EditString postal;
-    db_EditString country;
-} db_Address;
+    ui_EditString street;
+    ui_EditString street_extra;
+    ui_EditString city;
+    ui_EditString state;
+    ui_EditString postal;
+    ui_EditString country;
+} ui_Address;
 
+#define ROW_H 25
+#define PAD 10
 
-void db_ui_label(db_State * s, const char * label) {
-    nk_label(s->ctx, label, NK_TEXT_LEFT);
-}
+int ui_address(Rectangle bounds, ui_Address * out) {
+    assert(bounds.height == -1 && "The address widget has a fixed height");
 
-#define PADDING 5
+    const int x = bounds.x;
+    const int w = bounds.width;
+    const int h = ROW_H;
+    const int qw = w / 4; /*quarter width*/
 
-void db_ui_edit_string(db_State * s, const char * label, db_EditString * out) {
-    unsigned long len = s->ctx->style.font->width(s->ctx->style.font->userdata, s->ctx->style.font->height, label, strlen(label));
-    if(nk_group_begin(s->ctx, "Edit String", NK_WINDOW_BORDER | NK_WINDOW_NO_SCROLLBAR)) {
-        nk_layout_row_template_begin(s->ctx, s->ctx->style.font->height + s->ctx->style.window.padding.y * 2);
-        nk_layout_row_template_push_static(s->ctx, len);
-        nk_layout_row_template_push_variable(s->ctx, 100);
-        nk_layout_row_template_end(s->ctx);
-        db_ui_label(s, label);
-        nk_edit_string(s->ctx, NK_EDIT_FIELD, out->buf, &out->len, sizeof(out->buf), NULL);
-        nk_group_end(s->ctx);
-    }
+    int y = bounds.y;
 
-}
+    GuiSetStyle(LABEL, TEXT_ALIGNMENT, TEXT_ALIGN_RIGHT);
 
-/
-int db_ui_address(db_State * s, db_Address * addr) {
-    nk_layout_row_dynamic(s->ctx, s->ctx->style.font->height * 3 + s->ctx->style.window.padding.y * 19, 1);
-    if(nk_group_begin_titled(s->ctx, "Address", "Address Information", NK_WINDOW_DYNAMIC)) {
+    GuiLabel((Rectangle){x, y, qw, h}, "Street:");
+    ui_textbox((Rectangle){x + qw, y, 3 * qw, h}, &out->street);
+    y += ROW_H + PAD;
 
-        nk_layout_row_dynamic(s->ctx, s->ctx->style.font->height + s->ctx->style.window.padding.y * 4, 1);
-        db_ui_edit_string(s, "Street: ",  &addr->street);
+    GuiLabel((Rectangle){x, y, qw, h}, "PO/Apt #:");
+    ui_textbox((Rectangle){x + qw, y, qw, h}, &out->street_extra);
+    GuiLabel((Rectangle){x + 2 * qw, y, qw, h}, "City:");
+    ui_textbox((Rectangle){x + 3 * qw, y, qw, h}, &out->city);
+    y += ROW_H + PAD;
 
-        nk_layout_row_dynamic(s->ctx, s->ctx->style.font->height + s->ctx->style.window.padding.y * 4, 2);
-        db_ui_edit_string(s, "PO/APT #: ", &addr->street_extra);
-        db_ui_edit_string(s, "City: ", &addr->city);
+    GuiLabel((Rectangle){x, y, qw, h}, "State:");
+    ui_textbox((Rectangle){x + qw, y, qw, h}, &out->state);
+    GuiLabel((Rectangle){x + 2 * qw, y, qw, h}, "Postal:");
+    ui_textbox((Rectangle){x + 3 * qw, y, qw, h}, &out->postal);
+    y += ROW_H + PAD;
 
-        nk_layout_row_dynamic(s->ctx, s->ctx->style.font->height + s->ctx->style.window.padding.y * 4, 3);
-        db_ui_edit_string(s, "State: ", &addr->state);
-        db_ui_edit_string(s, "Postal: ", &addr->postal);
-        db_ui_edit_string(s, "Country: ", &addr->country);
+    GuiLabel((Rectangle){x, y, qw, h}, "Country:");
+    ui_textbox((Rectangle){x + qw, y, 3 * qw, h}, &out->country);
+    y += ROW_H + PAD;
 
-        nk_group_end(s->ctx);
-    }
+    return y;
 }

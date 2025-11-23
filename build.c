@@ -135,7 +135,7 @@ void libraylib(void) {
 
             core_strfmt(cmd, sizeof(cmd), &fill, cc());
 
-            core_strfmt(cmd, sizeof(cmd), &fill, " -c -I"RAYLIB_DIR"external/glfw/include -I"RAYLIB_DIR" ");
+            core_strfmt(cmd, sizeof(cmd), &fill, " -c -I"RAYLIB_DIR"external/glfw/include ");
             if(target() == OS_LINUX) {
                 core_strfmt(cmd, sizeof(cmd), &fill, "-D_GLFW_WAYLAND -D_GLFW_X11 ");
             }
@@ -187,7 +187,7 @@ void build_main(void) {
 
     core_strfmt(cmd, sizeof(cmd), &fill, cc());
     core_strfmt(cmd, sizeof(cmd), &fill, " src/main.c ");
-    core_strfmt(cmd, sizeof(cmd), &fill, "-Isrc/3rdparty/ ");
+    //    core_strfmt(cmd, sizeof(cmd), &fill, "-Isrc/3rdparty/ ");
     core_strfmt(cmd, sizeof(cmd), &fill, "-Wall -Wextra -Wpedantic -std=c99 " /* "-fsanitize=undefined " */);
     core_strfmt(cmd, sizeof(cmd), &fill, SQLITE_OBJ);
     for(i = 0; i < CORE_ARRAY_LEN(raylib_obj); ++i) {

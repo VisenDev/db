@@ -43,15 +43,15 @@
 #include <poll.h>
 #include <linux/input-event-codes.h>
 
-#include "wayland-client-protocol.h"
-#include "xdg-shell-client-protocol.h"
-#include "xdg-decoration-unstable-v1-client-protocol.h"
-#include "viewporter-client-protocol.h"
-#include "relative-pointer-unstable-v1-client-protocol.h"
-#include "pointer-constraints-unstable-v1-client-protocol.h"
-#include "xdg-activation-v1-client-protocol.h"
-#include "idle-inhibit-unstable-v1-client-protocol.h"
-#include "fractional-scale-v1-client-protocol.h"
+#include "../../../wayland-client-protocol.h"
+#include "../../../xdg-shell-client-protocol.h"
+#include "../../../xdg-decoration-unstable-v1-client-protocol.h"
+#include "../../../viewporter-client-protocol.h"
+#include "../../../relative-pointer-unstable-v1-client-protocol.h"
+#include "../../../pointer-constraints-unstable-v1-client-protocol.h"
+#include "../../../xdg-activation-v1-client-protocol.h"
+#include "../../../idle-inhibit-unstable-v1-client-protocol.h"
+#include "../../../fractional-scale-v1-client-protocol.h"
 
 #define GLFW_BORDER_SIZE    4
 #define GLFW_CAPTION_HEIGHT 24

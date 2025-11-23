@@ -2,31 +2,27 @@
 #include <unistd.h>
 
 /* 3rdparty */
-#include <raylib/raylib.h>
+#include "3rdparty/raylib/raylib.h"
 #define RAYGUI_IMPLEMENTATION
-#include <raygui/src/raygui.h>
-#include <raygui/examples/styles/style_amber.h>
-#include <raygui/examples/styles/style_ashes.h>
-#include <raygui/examples/styles/style_bluish.h>  
-#include <raygui/examples/styles/style_candy.h>  
-#include <raygui/examples/styles/style_cherry.h>
-#include <raygui/examples/styles/style_cyber.h>
-#include <raygui/examples/styles/style_dark.h>
-#include <raygui/examples/styles/style_enefete.h> 
-#include <raygui/examples/styles/style_jungle.h>  
-#include <raygui/examples/styles/style_lavanda.h> 
-#include <raygui/examples/styles/style_sunny.h>   
-#include <raygui/examples/styles/style_terminal.h>
+#include "3rdparty/raygui/src/raygui.h"
+#include "3rdparty/raygui/examples/styles/style_amber.h"
+#include "3rdparty/raygui/examples/styles/style_ashes.h"
+#include "3rdparty/raygui/examples/styles/style_bluish.h"  
+#include "3rdparty/raygui/examples/styles/style_candy.h"  
+#include "3rdparty/raygui/examples/styles/style_cherry.h"
+#include "3rdparty/raygui/examples/styles/style_cyber.h"
+#include "3rdparty/raygui/examples/styles/style_dark.h"
+#include "3rdparty/raygui/examples/styles/style_enefete.h" 
+#include "3rdparty/raygui/examples/styles/style_jungle.h"  
+#include "3rdparty/raygui/examples/styles/style_lavanda.h" 
+#include "3rdparty/raygui/examples/styles/style_sunny.h"   
+#include "3rdparty/raygui/examples/styles/style_terminal.h"
+#include "3rdparty/sqlite/sqlite3.h"
+#define  CORE_IMPLEMENTATION
+#include "3rdparty/core.h/core.h"
 
-#include <sqlite/sqlite3.h>
-#define CORE_IMPLEMENTATION
-#include <core.h/core.h>
-#define NK_INCLUDE_DEFAULT_FONT
-#define RAYLIB_NUKLEAR_IMPLEMENTATION
-#define RAYLIB_NUKLEAR_INCLUDE_DEFAULT_FONT
-#include <raylib-nuklear/raylib-nuklear.h>
-#include <nuklear/style.c>
-
+/*Local*/
+#include "ui.c"
 
 typedef enum {
     DB_MENU_TAB_HOME,
@@ -44,6 +40,8 @@ typedef struct {
     core_Arena * arena;
     sqlite3 * db;
     db_MenuTab menu_tab;
+    int gui_style_active;
+    int gui_style_previous;
 } db_State;
 
 core_Bool db_exec_sql_file(sqlite3 * db, const char * sql_file_path) {
@@ -81,7 +79,7 @@ void db_application_init(db_State ** out) {
 
     SetConfigFlags(FLAG_WINDOW_RESIZABLE);
     InitWindow(1000, 750, "db");
-    //    GuiLoadStyleDark();
+    s->gui_style_active = 3;
 }
 
 void db_application_deinit(db_State ** state) {
@@ -93,67 +91,6 @@ void db_application_deinit(db_State ** state) {
     *state = NULL;
 }
 
-
-#define EDIT_STRING_CAP 1024
-
-typedef struct {
-    char buf[EDIT_STRING_CAP];
-    int len;
-    bool active;
-} ui_EditString;
-
-void ui_textbox(Rectangle bounds, ui_EditString * out) {
-    if (GuiTextBox(bounds, out->buf, EDIT_STRING_CAP, out->active)) {
-        out->active = !out->active;
-    }
-}
-
-typedef struct {
-    ui_EditString street;
-    ui_EditString street_extra;
-    ui_EditString city;
-    ui_EditString state;
-    ui_EditString postal;
-    ui_EditString country;
-} ui_Address;
-
-#define ROW_H 25
-#define PAD 10
-
-int ui_address(Rectangle bounds, ui_Address * out) {
-    assert(bounds.height == -1 && "The address widget has a fixed height");
-
-    const int x = bounds.x;
-    const int w = bounds.width;
-    const int h = ROW_H;
-    const int qw = w / 4; /*quarter width*/
-
-    int y = bounds.y;
-
-    GuiSetStyle(LABEL, TEXT_ALIGNMENT, TEXT_ALIGN_RIGHT);
-
-    GuiLabel((Rectangle){x, y, qw, h}, "Street:");
-    ui_textbox((Rectangle){x + qw, y, 3 * qw, h}, &out->street);
-    y += ROW_H + PAD;
-
-    GuiLabel((Rectangle){x, y, qw, h}, "PO/Apt #:");
-    ui_textbox((Rectangle){x + qw, y, qw, h}, &out->street_extra);
-    GuiLabel((Rectangle){x + 2 * qw, y, qw, h}, "City:");
-    ui_textbox((Rectangle){x + 3 * qw, y, qw, h}, &out->city);
-    y += ROW_H + PAD;
-
-    GuiLabel((Rectangle){x, y, qw, h}, "State:");
-    ui_textbox((Rectangle){x + qw, y, qw, h}, &out->state);
-    GuiLabel((Rectangle){x + 2 * qw, y, qw, h}, "Postal:");
-    ui_textbox((Rectangle){x + 3 * qw, y, qw, h}, &out->postal);
-    y += ROW_H + PAD;
-
-    GuiLabel((Rectangle){x, y, qw, h}, "Country:");
-    ui_textbox((Rectangle){x + qw, y, 3 * qw, h}, &out->country);
-    y += ROW_H + PAD;
-
-    return y;
-}
 
 int main(void) {
     db_State * s;
@@ -168,9 +105,6 @@ int main(void) {
     };
     int next = 0;
     // Load default style
-    GuiLoadStyleDefault();
-    int visualStyleActive = 0;
-    int prevVisualStyleActive = 0;
 
 
     while(!WindowShouldClose()) {
@@ -194,13 +128,13 @@ int main(void) {
         y += PAD + ROW_H;
 
 
-        if (visualStyleActive != prevVisualStyleActive)
+        if (s->gui_style_active != s->gui_style_previous)
             {
                 // Reset to default internal style
                 // NOTE: Required to unload any previously loaded font texture
                 GuiLoadStyleDefault();
 
-                switch (visualStyleActive)
+                switch (s->gui_style_active)
                     {
                     case 1: GuiLoadStyleJungle(); break;
                     case 2: GuiLoadStyleCandy(); break;
@@ -216,9 +150,9 @@ int main(void) {
                     default: break;
                     }
 
-                prevVisualStyleActive = visualStyleActive;
+                s->gui_style_previous = s->gui_style_active;
             }
-        GuiComboBox((Rectangle){ x, y, width, ROW_H }, "default;Jungle;Candy;Lavanda;Cyber;Terminal;Ashes;Bluish;Dark;Cherry;Sunny;Enefete", &visualStyleActive);
+        GuiComboBox((Rectangle){ x, y, width, ROW_H }, "default;Jungle;Candy;Lavanda;Cyber;Terminal;Ashes;Bluish;Dark;Cherry;Sunny;Enefete", &s->gui_style_active);
 
     }
     EndDrawing();

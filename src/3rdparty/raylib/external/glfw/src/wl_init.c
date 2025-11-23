@@ -41,15 +41,15 @@
 #include <time.h>
 #include <assert.h>
 
-#include "wayland-client-protocol.h"
-#include "xdg-shell-client-protocol.h"
-#include "xdg-decoration-unstable-v1-client-protocol.h"
-#include "viewporter-client-protocol.h"
-#include "relative-pointer-unstable-v1-client-protocol.h"
-#include "pointer-constraints-unstable-v1-client-protocol.h"
-#include "fractional-scale-v1-client-protocol.h"
-#include "xdg-activation-v1-client-protocol.h"
-#include "idle-inhibit-unstable-v1-client-protocol.h"
+#include "../../../wayland-client-protocol.h"
+#include "../../../xdg-shell-client-protocol.h"
+#include "../../../xdg-decoration-unstable-v1-client-protocol.h"
+#include "../../../viewporter-client-protocol.h"
+#include "../../../relative-pointer-unstable-v1-client-protocol.h"
+#include "../../../pointer-constraints-unstable-v1-client-protocol.h"
+#include "../../../fractional-scale-v1-client-protocol.h"
+#include "../../../xdg-activation-v1-client-protocol.h"
+#include "../../../idle-inhibit-unstable-v1-client-protocol.h"
 
 // NOTE: Versions of wayland-scanner prior to 1.17.91 named every global array of
 //       wl_interface pointers 'types', making it impossible to combine several unmodified
@@ -57,39 +57,39 @@
 // HACK: We override this name with a macro for each file, allowing them to coexist
 
 #define types _glfw_wayland_types
-#include "wayland-client-protocol-code.h"
+#include "../../../wayland-client-protocol-code.h"
 #undef types
 
 #define types _glfw_xdg_shell_types
-#include "xdg-shell-client-protocol-code.h"
+#include "../../../xdg-shell-client-protocol-code.h"
 #undef types
 
 #define types _glfw_xdg_decoration_types
-#include "xdg-decoration-unstable-v1-client-protocol-code.h"
+#include "../../../xdg-decoration-unstable-v1-client-protocol-code.h"
 #undef types
 
 #define types _glfw_viewporter_types
-#include "viewporter-client-protocol-code.h"
+#include "../../../viewporter-client-protocol-code.h"
 #undef types
 
 #define types _glfw_relative_pointer_types
-#include "relative-pointer-unstable-v1-client-protocol-code.h"
+#include "../../../relative-pointer-unstable-v1-client-protocol-code.h"
 #undef types
 
 #define types _glfw_pointer_constraints_types
-#include "pointer-constraints-unstable-v1-client-protocol-code.h"
+#include "../../../pointer-constraints-unstable-v1-client-protocol-code.h"
 #undef types
 
 #define types _glfw_fractional_scale_types
-#include "fractional-scale-v1-client-protocol-code.h"
+#include "../../../fractional-scale-v1-client-protocol-code.h"
 #undef types
 
 #define types _glfw_xdg_activation_types
-#include "xdg-activation-v1-client-protocol-code.h"
+#include "../../../xdg-activation-v1-client-protocol-code.h"
 #undef types
 
 #define types _glfw_idle_inhibit_types
-#include "idle-inhibit-unstable-v1-client-protocol-code.h"
+#include "../../../idle-inhibit-unstable-v1-client-protocol-code.h"
 #undef types
 
 static void wmBaseHandlePing(void* userData,
