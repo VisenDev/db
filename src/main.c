@@ -5,8 +5,19 @@
 #include <raylib/raylib.h>
 #define RAYGUI_IMPLEMENTATION
 #include <raygui/src/raygui.h>
-#include <raygui/examples/styles/style_jungle.h>
+#include <raygui/examples/styles/style_amber.h>
+#include <raygui/examples/styles/style_ashes.h>
+#include <raygui/examples/styles/style_bluish.h>  
+#include <raygui/examples/styles/style_candy.h>  
+#include <raygui/examples/styles/style_cherry.h>
+#include <raygui/examples/styles/style_cyber.h>
 #include <raygui/examples/styles/style_dark.h>
+#include <raygui/examples/styles/style_enefete.h> 
+#include <raygui/examples/styles/style_jungle.h>  
+#include <raygui/examples/styles/style_lavanda.h> 
+#include <raygui/examples/styles/style_sunny.h>   
+#include <raygui/examples/styles/style_terminal.h>
+
 #include <sqlite/sqlite3.h>
 #define CORE_IMPLEMENTATION
 #include <core.h/core.h>
@@ -33,7 +44,6 @@ typedef struct {
     core_Arena * arena;
     sqlite3 * db;
     db_MenuTab menu_tab;
-    struct nk_context * ctx;
 } db_State;
 
 core_Bool db_exec_sql_file(sqlite3 * db, const char * sql_file_path) {
@@ -48,127 +58,6 @@ core_Bool db_exec_sql_file(sqlite3 * db, const char * sql_file_path) {
     if(sqlite3_exec(db, buf, NULL, NULL, &exec_err) != 0) success = CORE_FALSE;
     core_arena_free(&arena);
     return success;
-}
-
-db_Status db_customer_new(db_State * s) {
-
-    static char name[256];
-    static int name_len = 0;
-    static char email[256];
-    static int email_len = 0;
-    static char city[256];
-    static int city_len = 0;
-    db_Status ret = DB_STATUS_DONE;
-    if (nk_group_begin_titled(s->ctx, "Add New Customer", "Add New Customer", NK_WINDOW_BORDER | NK_WINDOW_TITLE)) {
-        nk_layout_row_dynamic(s->ctx, 30, 2);
-    
-        nk_label(s->ctx, "Customer Name: ", NK_TEXT_RIGHT);
-        nk_edit_string(s->ctx, NK_EDIT_FIELD, name, &name_len, sizeof(name), NULL);
-
-        nk_label(s->ctx, "Customer Email: ", NK_TEXT_RIGHT);
-        nk_edit_string(s->ctx, NK_EDIT_FIELD, email, &email_len, sizeof(email), NULL);
-
-        nk_label(s->ctx, "Customer City: ", NK_TEXT_RIGHT);
-        nk_edit_string(s->ctx, NK_EDIT_FIELD, city, &city_len, sizeof(city), NULL);
-
-        if(nk_button_label(s->ctx, "Save")) {
-            int err;
-            sqlite3_stmt * stmt;
-            const char sql[] = "insert into customers(name, email, city) values(?, ?, ?);";
-            err = sqlite3_prepare_v2(s->db, sql, -1, &stmt, NULL);
-            if(err != SQLITE_OK) {
-                fprintf(stderr, "\n%s\n", sqlite3_errstr(err));
-                fprintf(stderr, "\n%s\n", sqlite3_errmsg(s->db));
-                CORE_TODO("Add an error handling popup");
-            }
-            sqlite3_bind_text(stmt, 1, name, name_len, SQLITE_TRANSIENT);
-            sqlite3_bind_text(stmt, 2, email, email_len, SQLITE_TRANSIENT);
-            sqlite3_bind_text(stmt, 3, city, city_len, SQLITE_TRANSIENT);
-            if(sqlite3_step(stmt) != SQLITE_DONE) {
-                CORE_TODO("Handle error");
-            }
-            sqlite3_finalize(stmt);
-            ret = DB_STATUS_DONE;
-        } else {
-            ret = DB_STATUS_PENDING;
-        }
-    }
-    nk_group_end(s->ctx);
-    return ret;
-}
-
-void db_menu_tab_button(db_State * s, const char * label, db_MenuTab menu_tab) {
-    struct nk_rect bounds = nk_widget_bounds(s->ctx);
-    const struct nk_input *in = &s->ctx->input;
-    char buf[1024];
-    db_MenuTab active = s->menu_tab;
-    if (nk_input_is_mouse_hovering_rect(in, bounds)) {
-        if(menu_tab == active) {
-            sqlite3_snprintf(sizeof(buf), buf, "Currently working on \"%s\"", label);
-        } else {
-            sqlite3_snprintf(sizeof(buf), buf, "Click to swap to \"%s\"", label);
-        }
-        nk_tooltip(s->ctx, buf);
-    }
-
-    if(menu_tab == active) {
-        nk_style_push_style_item(s->ctx, &s->ctx->style.button.normal, s->ctx->style.window.fixed_background);
-        nk_style_push_color(s->ctx, &s->ctx->style.button.border_color, s->ctx->style.window.background);
-        nk_style_push_style_item(s->ctx, &s->ctx->style.button.hover, s->ctx->style.window.fixed_background);
-        nk_style_push_style_item(s->ctx, &s->ctx->style.button.active, s->ctx->style.window.fixed_background);
-    }
-
-    if(nk_button_label(s->ctx, label)) s->menu_tab = menu_tab;
-
-    if(menu_tab == active) {
-        nk_style_pop_style_item(s->ctx);
-        nk_style_pop_color(s->ctx);
-        nk_style_pop_style_item(s->ctx);
-        nk_style_pop_style_item(s->ctx);
-    }
-}
-
-
-void db_application_run(db_State *s) {
-
-    /*tabs*/
-    if(nk_begin(s->ctx, "db", nk_rect(0, 0, GetScreenWidth(), GetScreenHeight()), NK_WINDOW_BORDER)) {
-        nk_layout_row_static(s->ctx, 30, 200, DB_MENU_TAB_COUNT);
-        db_menu_tab_button(s, "Home", DB_MENU_TAB_HOME);
-        db_menu_tab_button(s, "Customers", DB_MENU_TAB_CUSTOMERS);
-        db_menu_tab_button(s, "Open Orders", DB_MENU_TAB_OPEN_ORDERS);
-    }
-
-    switch(s->menu_tab) {
-    case DB_MENU_TAB_HOME: {
-        nk_label(s->ctx, "Welcome to db!", NK_TEXT_RIGHT);
-        nk_style_select(s->ctx);
-    } break;
-    case DB_MENU_TAB_OPEN_ORDERS: {
-        /* static db_Address addr = {0}; */
-        /* nk_label(s->ctx, "<in development, this page will show open orders>", NK_TEXT_RIGHT); */
-        /* db_ui_address(s, &addr); */
-    } break;
-    case DB_MENU_TAB_CUSTOMERS: {
-        nk_layout_row_template_begin(s->ctx, 500);
-        nk_layout_row_template_push_variable(s->ctx, 80);
-        nk_layout_row_template_push_static(s->ctx, 400);
-        nk_layout_row_template_end(s->ctx);
-
-        nk_group_begin(s->ctx, "label", 0);
-        nk_layout_row_dynamic(s->ctx, 20, 1);
-        nk_label(s->ctx, "<in development, this page will show open customers>", NK_TEXT_RIGHT);
-        nk_label(s->ctx, "<in development, this page will show open customers>", NK_TEXT_RIGHT);
-        nk_label(s->ctx, "<in development, this page will show open customers>", NK_TEXT_RIGHT);
-        nk_label(s->ctx, "<in development, this page will show open customers>", NK_TEXT_RIGHT);
-        nk_group_end(s->ctx);
-
-        db_customer_new(s);
-    } break;
-    case DB_MENU_TAB_COUNT:
-        CORE_UNREACHABLE;
-    }
-    nk_end(s->ctx);
 }
 
 void db_application_init(db_State ** out) {
@@ -192,11 +81,7 @@ void db_application_init(db_State ** out) {
 
     SetConfigFlags(FLAG_WINDOW_RESIZABLE);
     InitWindow(1000, 750, "db");
-
-    /* font = LoadFontFromNuklear(-1); */
-    /* font = GetFontDefault(); */
-    //s->ctx = InitNuklearEx(font, RAYLIB_NUKLEAR_DEFAULT_FONTSIZE * 2);
-    /*    nk_set_style(s->ctx, THEME_WHITE); */
+    //    GuiLoadStyleDark();
 }
 
 void db_application_deinit(db_State ** state) {
@@ -273,23 +158,68 @@ int ui_address(Rectangle bounds, ui_Address * out) {
 int main(void) {
     db_State * s;
     db_application_init(&s);
+
     ui_Address address = {0};
-    GuiLoadStyleDark();
+    int tab = 0;
+    static const char * tabs[] = {
+        "Home",
+        "Customers",
+        "Open Orders"
+    };
+    int next = 0;
+    // Load default style
+    GuiLoadStyleDefault();
+    int visualStyleActive = 0;
+    int prevVisualStyleActive = 0;
+
 
     while(!WindowShouldClose()) {
     BeginDrawing();
     {
         const int width = 512;
+        int x = PAD;
+        int y = 0;
+
         
         ClearBackground(GetColor(GuiGetStyle(DEFAULT, BACKGROUND_COLOR)));
-        GuiPanel((Rectangle){ 0, 0, width + PAD * 2, 210 }, "Address Information");
+        //GuiTabBar((Rectangle){x, y, width, ROW_H}, tabs, CORE_ARRAY_LEN(tabs), &next);
+        //GuiPanel((Rectangle){ 0, 0, width + PAD * 2, 210 }, "Address Information");
+        GuiToggleGroup((Rectangle){x, y, width / 3, ROW_H}, "Home;Customers;Open Orders", &next);
+        y += PAD + ROW_H;
         
-        int x = PAD;
-        int y = PAD + ROW_H;
         y = ui_address((Rectangle) {x, y, width, -1}, &address);
         if(GuiButton((Rectangle){ x, y, width, ROW_H }, "Save")) {
             printf("y: %d\n", y);
         }
+        y += PAD + ROW_H;
+
+
+        if (visualStyleActive != prevVisualStyleActive)
+            {
+                // Reset to default internal style
+                // NOTE: Required to unload any previously loaded font texture
+                GuiLoadStyleDefault();
+
+                switch (visualStyleActive)
+                    {
+                    case 1: GuiLoadStyleJungle(); break;
+                    case 2: GuiLoadStyleCandy(); break;
+                    case 3: GuiLoadStyleLavanda(); break;
+                    case 4: GuiLoadStyleCyber(); break;
+                    case 5: GuiLoadStyleTerminal(); break;
+                    case 6: GuiLoadStyleAshes(); break;
+                    case 7: GuiLoadStyleBluish(); break;
+                    case 8: GuiLoadStyleDark(); break;
+                    case 9: GuiLoadStyleCherry(); break;
+                    case 10: GuiLoadStyleSunny(); break;
+                    case 11: GuiLoadStyleEnefete(); break;
+                    default: break;
+                    }
+
+                prevVisualStyleActive = visualStyleActive;
+            }
+        GuiComboBox((Rectangle){ x, y, width, ROW_H }, "default;Jungle;Candy;Lavanda;Cyber;Terminal;Ashes;Bluish;Dark;Cherry;Sunny;Enefete", &visualStyleActive);
+
     }
     EndDrawing();
     }
