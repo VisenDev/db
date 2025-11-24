@@ -42,12 +42,13 @@ core_Bool db_exec_sql_file(sqlite3 * db, const char * sql_file_path) {
     buf = core_file_read_all_arena(&arena, fp);
     fclose(fp);
     if(sqlite3_exec(db, buf, NULL, NULL, &exec_err) != SQLITE_OK) success = CORE_FALSE;
+    //    printf("exec error: %s\n", exec_err);
     core_arena_free(&arena);
     return success;
 }
 
 void db_application_init(db_State ** out) {
-    bool init_database = true;
+    bool init_database = false;
     const char * db_path = ".main.db";
     db_State * s;
 
@@ -59,10 +60,7 @@ void db_application_init(db_State ** out) {
     s->arena = malloc(sizeof(core_Arena));
     memset(s->arena, 0, sizeof(core_Arena));
 
-    #if 0
-    /* TODO: fix this on windows */
     if(!core_file_exists(db_path)) init_database = true;
-    #endif
     if(sqlite3_open(db_path, &s->db) != SQLITE_OK) CORE_FATAL_ERROR("failed to open db");
     if(init_database)
         if(!db_exec_sql_file(s->db, "src/sql/db_init.sql")) CORE_FATAL_ERROR("Failed to init db");
@@ -143,7 +141,7 @@ int main(void) {
             menu_home(s);
             break;
         case DB_MENU_TAB_CUSTOMERS:
-            ui_customer_display_row(s, (Rectangle){PAD, 400, 512, ROW_H}, 1);
+            ui_customer_display_row(s, (Rectangle){0, ROW_H + PAD, 512, ROW_H}, 1);
             break;
         case DB_MENU_TAB_OPEN_ORDERS:
             break;

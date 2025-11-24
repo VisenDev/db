@@ -69,5 +69,7 @@ int ui_address(Rectangle bounds, ui_Address * out) {
     ui_textbox((Rectangle){x + qw, y, 3 * qw, h}, &out->country);
     y += ROW_H + PAD;
 
+    GuiSetStyle(LABEL, TEXT_ALIGNMENT, TEXT_ALIGN_LEFT);
+
     return y;
 }
