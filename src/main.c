@@ -132,7 +132,7 @@ int main(void) {
             break;
         case DB_MENU_TAB_CUSTOMERS:
             //            ui_customer_display_row(s, (Rectangle){0, ROW_H + PAD, 512, ROW_H}, 1);
-            menu_customers(s, (Rectangle){0, ROW_H, 512, ROW_H});
+            menu_customers(s, ROW_H);
             break;
         case DB_MENU_TAB_OPEN_ORDERS:
             break;

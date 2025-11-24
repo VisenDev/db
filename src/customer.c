@@ -23,27 +23,32 @@ const char * customer_sql =
 ;
 
 
-void ui_customer_display_row(db_State * s, Rectangle bounds, int id) {
-    const char * sql = "select * from customers where id = ?;";
-    sqlite3_stmt * stmt = db_prepare_and_bind(s, sql, "%d", id);
-    if(stmt == NULL) CORE_FATAL_ERROR("Failed to prepare statement");
-    sqlite3_step(stmt);
-
-    static char buf[1024];
-    sqlite3_snprintf(sizeof(buf), buf, "Id: %d      Name: %s ", sqlite3_column_int(stmt, 0), sqlite3_column_text(stmt, 1));
-    GuiLabel(bounds, buf);
-    (void)bounds;
-    if(stmt != NULL) {
-        sqlite3_finalize(stmt);
-    }
-}
-
-
-
-void menu_customers(db_State * s, Rectangle bounds) {
+void menu_customers(db_State * s, int y) {
     int count = db_count_rows(s, "customers");
     int i;
+    int w = 128;
+
+//    GuiGroupBox((Rectangle){0, y + 5, w, 0}, "Id");
+//    GuiGroupBox((Rectangle){0 + w, y + 5, w, 0}, "Name");
     for(i = 1; i < count; ++i) {
-        ui_customer_display_row(s, (Rectangle){bounds.x, bounds.y + (bounds.height + PAD) * (i - 1), bounds.width, bounds.height}, i);
+        const char * sql = "select * from customers where id = ?;";
+        Rectangle bounds = (Rectangle){0, y + (i * ROW_H), w, ROW_H};
+        sqlite3_stmt * stmt = db_prepare_and_bind(s, sql, "%d", i);
+        if(stmt == NULL) CORE_FATAL_ERROR("Failed to prepare statement");
+        sqlite3_step(stmt);
+
+        static char buf[1024];
+        sqlite3_snprintf(sizeof(buf), buf, "Id: %d", sqlite3_column_int(stmt, 0));
+        GuiGroupBox(bounds, NULL);
+        GuiLabel(bounds, buf);
+
+        bounds.x += bounds.width;
+        sqlite3_snprintf(sizeof(buf), buf, "Name: %s", sqlite3_column_text(stmt, 1));
+        GuiGroupBox(bounds, NULL);
+        GuiLabel(bounds, buf);
+
+        if(stmt != NULL) {
+            sqlite3_finalize(stmt);
+        }
     }
 }
