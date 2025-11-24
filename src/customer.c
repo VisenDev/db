@@ -22,44 +22,6 @@ const char * customer_sql =
 ");                                                                                                             \n"
 ;
 
-__attribute__((format (printf, 3, 4)))
-sqlite3_stmt * db_prepare_and_bind(db_State * s, const char * sql, const char * fmt, ...) {
-    
-    sqlite3_stmt * result = NULL;
-    const char * unused_bytes;
-    unsigned long i = 0;
-    const unsigned long len = strlen(sql);
-    if(sqlite3_prepare_v2(s->db, sql, len, &result, &unused_bytes) != SQLITE_OK) CORE_FATAL_ERROR("1");//return NULL;
-
-    core_Bool expect_fmt_char = false;
-    int binding_index = 1;
-    va_list args;
-    va_start(args, fmt);
-    for(i = 0; i < len; ++i) {
-        if(expect_fmt_char) {
-            switch(fmt[i]) {
-            case 'd': if(sqlite3_bind_int(result, binding_index++, va_arg(args, int)) != SQLITE_OK) goto err; break;
-            case 's': if(sqlite3_bind_text(result, binding_index++, va_arg(args, char *), -1, NULL) != SQLITE_OK) goto err; break;
-            case 'l': if(sqlite3_bind_int64(result, binding_index++, va_arg(args, sqlite_int64)) != SQLITE_OK) goto err; break;
-            default: 
-                CORE_FATAL_ERROR("Unrecognized fmt character");
-            }
-            expect_fmt_char = CORE_FALSE;
-        } else {
-            if(fmt[i] == '%') expect_fmt_char = CORE_TRUE;
-        }
-    }
-    assert(expect_fmt_char == CORE_FALSE && "Stray % in fmt string");
-
-    if(0) {
-        err:
-        sqlite3_finalize(result);
-        result = NULL;
-    }
-    va_end(args);
-    return result;
-
-}
 
 void ui_customer_display_row(db_State * s, Rectangle bounds, int id) {
     const char * sql = "select * from customers where id = ?;";
@@ -68,10 +30,20 @@ void ui_customer_display_row(db_State * s, Rectangle bounds, int id) {
     sqlite3_step(stmt);
 
     static char buf[1024];
-    sqlite3_snprintf(sizeof(buf), buf, "%d", sqlite3_column_int(stmt, 1));
+    sqlite3_snprintf(sizeof(buf), buf, "Id: %d      Name: %s ", sqlite3_column_int(stmt, 0), sqlite3_column_text(stmt, 1));
     GuiLabel(bounds, buf);
     (void)bounds;
     if(stmt != NULL) {
         sqlite3_finalize(stmt);
+    }
+}
+
+
+
+void menu_customers(db_State * s, Rectangle bounds) {
+    int count = db_count_rows(s, "customers");
+    int i;
+    for(i = 1; i < count; ++i) {
+        ui_customer_display_row(s, (Rectangle){bounds.x, bounds.y + (bounds.height + PAD) * (i - 1), bounds.width, bounds.height}, i);
     }
 }

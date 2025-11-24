@@ -9,8 +9,6 @@
 #define  CORE_IMPLEMENTATION
 #include "3rdparty/core.h/core.h"
 
-/*Local*/
-#include "ui.c"
 
 typedef enum {
     DB_MENU_TAB_HOME = 0,
@@ -32,20 +30,11 @@ typedef struct {
     int gui_style_previous;
 } db_State;
 
-core_Bool db_exec_sql_file(sqlite3 * db, const char * sql_file_path) {
-    core_Arena arena = {0};
-    char * exec_err = NULL;
-    FILE * fp = fopen(sql_file_path, "r");
-    char * buf;
-    core_Bool success = CORE_TRUE;
-    if(!fp) return CORE_FALSE;
-    buf = core_file_read_all_arena(&arena, fp);
-    fclose(fp);
-    if(sqlite3_exec(db, buf, NULL, NULL, &exec_err) != SQLITE_OK) success = CORE_FALSE;
-    //    printf("exec error: %s\n", exec_err);
-    core_arena_free(&arena);
-    return success;
-}
+/*Local*/
+#include "sql.c"
+#include "ui.c"
+#include "customer.c"
+
 
 void db_application_init(db_State ** out) {
     bool init_database = false;
@@ -68,7 +57,10 @@ void db_application_init(db_State ** out) {
 
     SetConfigFlags(FLAG_WINDOW_RESIZABLE);
     InitWindow(1000, 750, "db");
-    s->gui_style_active = 3;
+    s->gui_style_active = 8;
+
+    SetWindowSize(GetScreenWidth(), GetScreenHeight() - 1);
+    SetWindowSize(GetScreenWidth(), GetScreenHeight() + 1);
 }
 
 void db_application_begin_drawing(db_State * s) {
@@ -125,8 +117,6 @@ void menu_home(db_State * s) {
     GuiComboBox((Rectangle){ x, y, width, ROW_H }, "default;Jungle;Candy;Lavanda;Cyber;Terminal;Ashes;Bluish;Dark;Cherry;Sunny;Enefete", &s->gui_style_active);
 }
 
-#include "customer.c"
-
 int main(void) {
     db_State * s;
     db_application_init(&s);
@@ -141,7 +131,8 @@ int main(void) {
             menu_home(s);
             break;
         case DB_MENU_TAB_CUSTOMERS:
-            ui_customer_display_row(s, (Rectangle){0, ROW_H + PAD, 512, ROW_H}, 1);
+            //            ui_customer_display_row(s, (Rectangle){0, ROW_H + PAD, 512, ROW_H}, 1);
+            menu_customers(s, (Rectangle){0, ROW_H, 512, ROW_H});
             break;
         case DB_MENU_TAB_OPEN_ORDERS:
             break;
