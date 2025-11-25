@@ -57,7 +57,7 @@ void db_application_init(db_State ** out) {
 
     SetConfigFlags(FLAG_WINDOW_RESIZABLE);
     InitWindow(1000, 750, "db");
-    s->gui_style_active = 8;
+    s->gui_style_active = 0;
 
     SetWindowSize(GetScreenWidth(), GetScreenHeight() - 1);
     SetWindowSize(GetScreenWidth(), GetScreenHeight() + 1);
@@ -124,6 +124,7 @@ int main(void) {
     while(!WindowShouldClose()) {
         db_application_begin_drawing(s);
         
+        GuiSetStyle(DEFAULT, TEXT_ALIGNMENT, TEXT_ALIGN_CENTER);
         GuiToggleGroup((Rectangle){0, 0, GetScreenWidth() / 3, ROW_H}, "Home;Customers;Open Orders", (int*)&s->menu_tab);
 
         switch(s->menu_tab) {
