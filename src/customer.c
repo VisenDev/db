@@ -26,29 +26,50 @@ const char * customer_sql =
 void menu_customers(db_State * s, int y) {
     int count = db_count_rows(s, "customers");
     int i;
-    int w = 128;
+    int w = (GetScreenWidth() / 3) - PAD * 2;
+    static int edit_id = -1;
+    static Vector2 scroll = {0};
+    static Rectangle v = {0};
 
-//    GuiGroupBox((Rectangle){0, y + 5, w, 0}, "Id");
-//    GuiGroupBox((Rectangle){0 + w, y + 5, w, 0}, "Name");
-    for(i = 1; i < count; ++i) {
+    //TODO: swap the current scroll panel with a GuiListView
+    //    GuiListView();
+
+    GuiScrollPanel((Rectangle){PAD, y + PAD, w, GetScreenHeight() - y - 2 * PAD }, "Customers", (Rectangle){0, y, w - 14, count * ROW_H}, &scroll, &v);
+
+    BeginScissorMode(v.x, v.y, v.width, v.height);
+    for(i = 0; i < count; ++i) {
         const char * sql = "select * from customers where id = ?;";
-        Rectangle bounds = (Rectangle){0, y + (i * ROW_H), w, ROW_H};
-        sqlite3_stmt * stmt = db_prepare_and_bind(s, sql, "%d", i);
+        Rectangle bounds = (Rectangle){v.x + scroll.x, v.y + (i * ROW_H) + scroll.y, v.width / 2, ROW_H};
+        sqlite3_stmt * stmt = db_prepare_and_bind(s, sql, "%d", i + 1);
         if(stmt == NULL) CORE_FATAL_ERROR("Failed to prepare statement");
         sqlite3_step(stmt);
 
         static char buf[1024];
-        sqlite3_snprintf(sizeof(buf), buf, "Id: %d", sqlite3_column_int(stmt, 0));
-        GuiGroupBox(bounds, NULL);
-        GuiLabel(bounds, buf);
-
-        bounds.x += bounds.width;
         sqlite3_snprintf(sizeof(buf), buf, "Name: %s", sqlite3_column_text(stmt, 1));
-        GuiGroupBox(bounds, NULL);
-        GuiLabel(bounds, buf);
+        if(GuiButton(bounds, buf)) {
+            edit_id = i + 1;
+        }
+        /* sqlite3_snprintf(sizeof(buf), buf, "Id: %d", sqlite3_column_int(stmt, 0)); */
+        /* GuiGroupBox(bounds, NULL); */
+        /* GuiLabel(bounds, buf); */
+
+        /* bounds.x += bounds.width; */
+        /* sqlite3_snprintf(sizeof(buf), buf, "Name: %s", sqlite3_column_text(stmt, 1)); */
+        /* GuiGroupBox(bounds, NULL); */
+        /* GuiLabel(bounds, buf); */
 
         if(stmt != NULL) {
             sqlite3_finalize(stmt);
         }
     }
+    EndScissorMode();
+
+    Rectangle edit_bounds = (Rectangle){(GetScreenWidth() / 3) + PAD, y + PAD, w * 2 + PAD + PAD, 256};
+    GuiPanel(edit_bounds, "Edit Customer");
+    if(edit_id != -1) {
+        edit_bounds.y = y + PAD + ROW_H;
+        edit_bounds.height = ROW_H;
+        GuiLabel(edit_bounds, "Edit Customer Information Here");
+    }
+
 }
