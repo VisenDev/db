@@ -26,3 +26,15 @@ src/3rdparty/raylib/xdg-shell-client-protocol-code.h
 src/3rdparty/raylib/xdg-shell-client-protocol.h
 src/.build/*
 src/build/*
+src/3rdparty/raygui/examples/animation_curve/animation_curve
+src/3rdparty/raygui/examples/controls_test_suite/controls_test_suite
+src/3rdparty/raygui/examples/custom_file_dialog/custom_file_dialog
+src/3rdparty/raygui/examples/custom_input_box/custom_input_box
+src/3rdparty/raygui/examples/custom_sliders/custom_sliders
+src/3rdparty/raygui/examples/floating_window/floating_window
+src/3rdparty/raygui/examples/image_exporter/image_exporter
+src/3rdparty/raygui/examples/image_importer_raw/image_importer_raw
+src/3rdparty/raygui/examples/portable_window/portable_window
+src/3rdparty/raygui/examples/property_list/property_list
+src/3rdparty/raygui/examples/scroll_panel/scroll_panel
+src/3rdparty/raygui/examples/style_selector/style_selector
