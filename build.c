@@ -87,7 +87,7 @@ void sqlite_obj(void) {
     static const char * deps[] = { SQLITE_SRC, "build.c" };
     if(core_file_needs_update(SQLITE_OBJ, deps, CORE_ARRAY_LEN(deps))) {
         core_strfmt(cmd, sizeof(cmd), &fill, cc());
-        core_strfmt(cmd, sizeof(cmd), &fill, " -c " SQLITE_SRC " -o " SQLITE_OBJ);
+        core_strfmt(cmd, sizeof(cmd), &fill, " -g -c " SQLITE_SRC " -o " SQLITE_OBJ);
         puts(cmd);
         if(system(cmd) != 0) CORE_FATAL_ERROR("Failed to build sqlite obj");
     } else {
@@ -135,7 +135,7 @@ void libraylib(void) {
 
             core_strfmt(cmd, sizeof(cmd), &fill, cc());
 
-            core_strfmt(cmd, sizeof(cmd), &fill, " -c -I"RAYLIB_DIR"external/glfw/include ");
+            core_strfmt(cmd, sizeof(cmd), &fill, " -g -c -I"RAYLIB_DIR"external/glfw/include ");
             if(target() == OS_LINUX) {
                 core_strfmt(cmd, sizeof(cmd), &fill, "-D_GLFW_WAYLAND -D_GLFW_X11 ");
             }
@@ -188,7 +188,7 @@ void build_main(void) {
     core_strfmt(cmd, sizeof(cmd), &fill, cc());
     core_strfmt(cmd, sizeof(cmd), &fill, " src/main.c ");
     //    core_strfmt(cmd, sizeof(cmd), &fill, "-Isrc/3rdparty/ ");
-    core_strfmt(cmd, sizeof(cmd), &fill, "-Wall -Wextra -Wpedantic -std=c99 " /* "-fsanitize=undefined " */);
+    core_strfmt(cmd, sizeof(cmd), &fill, "-g -Wall -Wextra -Wpedantic -std=c99 " /* "-fsanitize=undefined " */);
     core_strfmt(cmd, sizeof(cmd), &fill, SQLITE_OBJ);
     for(i = 0; i < CORE_ARRAY_LEN(raylib_obj); ++i) {
         core_strfmt(cmd, sizeof(cmd), &fill, " ");
