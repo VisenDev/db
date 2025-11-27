@@ -189,20 +189,23 @@ void db_customer_write(db_State * s, const db_Customer * in) {
         core_on_exit(db_finalize_stmt, stmt);
     }
     int index = 1;
-    if(SQLITE_OK != sqlite3_bind_text(stmt, index++, in->name.buf, -1, SQLITE_TRANSIENT)) DB_FATAL_SQL_ERROR(s, sql);
-    if(SQLITE_OK != sqlite3_bind_text(stmt, index++, in->address_line1.buf, -1, SQLITE_TRANSIENT)) DB_FATAL_SQL_ERROR(s, sql);
-    if(SQLITE_OK != sqlite3_bind_text(stmt, index++, in->address_line2.buf, -1, SQLITE_TRANSIENT)) DB_FATAL_SQL_ERROR(s, sql);
-    if(SQLITE_OK != sqlite3_bind_text(stmt, index++, in->city.buf, -1, SQLITE_TRANSIENT)) DB_FATAL_SQL_ERROR(s, sql);
-    if(SQLITE_OK != sqlite3_bind_text(stmt, index++, in->state.buf, -1, SQLITE_TRANSIENT)) DB_FATAL_SQL_ERROR(s, sql);
-    if(SQLITE_OK != sqlite3_bind_text(stmt, index++, in->postal_code.buf, -1, SQLITE_TRANSIENT)) DB_FATAL_SQL_ERROR(s, sql);
-    if(SQLITE_OK != sqlite3_bind_text(stmt, index++, in->country.buf, -1, SQLITE_TRANSIENT)) DB_FATAL_SQL_ERROR(s, sql);
-    if(SQLITE_OK != sqlite3_bind_text(stmt, index++, in->phone.buf, -1, SQLITE_TRANSIENT)) DB_FATAL_SQL_ERROR(s, sql);
-    if(SQLITE_OK != sqlite3_bind_text(stmt, index++, in->email.buf, -1, SQLITE_TRANSIENT)) DB_FATAL_SQL_ERROR(s, sql);
-    if(SQLITE_OK != sqlite3_bind_text(stmt, index++, in->website.buf, -1, SQLITE_TRANSIENT)) DB_FATAL_SQL_ERROR(s, sql);
-    if(SQLITE_OK != sqlite3_bind_text(stmt, index++, in->primary_contact_name.buf, -1, SQLITE_TRANSIENT)) DB_FATAL_SQL_ERROR(s, sql);
-    if(SQLITE_OK != sqlite3_bind_text(stmt, index++, in->primary_contact_phone.buf, -1, SQLITE_TRANSIENT)) DB_FATAL_SQL_ERROR(s, sql);
-    if(SQLITE_OK != sqlite3_bind_text(stmt, index++, in->primary_contact_email.buf, -1, SQLITE_TRANSIENT)) DB_FATAL_SQL_ERROR(s, sql);
-    if(SQLITE_OK != sqlite3_bind_text(stmt, index++, in->notes.buf, -1, SQLITE_TRANSIENT)) DB_FATAL_SQL_ERROR(s, sql);
+
+    db_bind_editstring(s, stmt, index++, &in->name);
+    db_bind_editstring(s, stmt, index++, &in->address_line1);
+    db_bind_editstring(s, stmt, index++, &in->address_line2);
+    db_bind_editstring(s, stmt, index++, &in->city);
+    db_bind_editstring(s, stmt, index++, &in->state);
+    db_bind_editstring(s, stmt, index++, &in->postal_code);
+    db_bind_editstring(s, stmt, index++, &in->country);
+    db_bind_editstring(s, stmt, index++, &in->phone);
+    db_bind_editstring(s, stmt, index++, &in->email);
+    db_bind_editstring(s, stmt, index++, &in->website);
+    db_bind_editstring(s, stmt, index++, &in->primary_contact_name);
+    db_bind_editstring(s, stmt, index++, &in->primary_contact_phone);
+    db_bind_editstring(s, stmt, index++, &in->primary_contact_email);
+    db_bind_editstring(s, stmt, index++, &in->notes);
+
+
     time_t updated_at_time;
     time(&updated_at_time);
     sqlite3_bind_int(stmt, index++, updated_at_time);
@@ -235,6 +238,7 @@ void menu_customers(db_State * s, int y) {
             free(id_mapping);
         }
         id_mapping = malloc(sizeof(int) * num_customers);
+        id_mapping_len = num_customers;
     }
 
     if(sqlite3_prepare_v2(s->db, sql, strlen(sql), &stmt, &unused_bytes) != SQLITE_OK) DB_FATAL_SQL_ERROR(s, sql);
@@ -244,7 +248,9 @@ void menu_customers(db_State * s, int y) {
         if(fill != 0) {
             core_strfmt(buf, sizeof(buf), &fill, ";");
         }
+        assert(i < id_mapping_len);
         id_mapping[i] = sqlite3_column_int(stmt, 0);
+        if(id_mapping[i] == 0) CORE_FATAL_ERROR("Null id");
         static char num[1024];
         sqlite3_snprintf(sizeof(num), num, " [%03d] ", id_mapping[i]);
         core_strfmt(buf, sizeof(buf), &fill, num);
@@ -258,36 +264,63 @@ void menu_customers(db_State * s, int y) {
     GuiSetStyle(DEFAULT, TEXT_ALIGNMENT, TEXT_ALIGN_LEFT);
     GuiListView((Rectangle){PAD, y + PAD, w, GetScreenHeight() - y - 2 * PAD}, buf, &scroll_index, &active_id);
 
-    Rectangle edit_bounds = (Rectangle){(GetScreenWidth() / 3) + PAD - PAD / 2, y + PAD, w * 2 + PAD + PAD, GetScreenHeight() - y - 2 * PAD};
+    Rectangle edit_bounds = (Rectangle){(GetScreenWidth() / 3) + PAD - PAD / 2, y + PAD, w * 2 + PAD + (PAD * 0.75), GetScreenHeight() - y - 2 * PAD};
     GuiPanel(edit_bounds, "Edit Customer");
     if(active_id != -1) {
         edit_bounds.y = y + PAD + ROW_H;
         edit_bounds.x += PAD;
         edit_bounds.height = ROW_H;
 
-        GuiLabel(edit_bounds, "Edit Customer Information Here");
+        char msg[1024];
+        GuiSetStyle(DEFAULT, TEXT_ALIGNMENT, TEXT_ALIGN_CENTER);
+        sqlite3_snprintf(sizeof(msg), msg, "Editing Customer Id [%003d]", id_mapping[active_id]);
+        GuiLabel(edit_bounds, msg);
         static db_Customer customer = {0};
         if(old_active_id != active_id) {
             db_customer_read(s, id_mapping[active_id], &customer);
             old_active_id = active_id;
         }
-
         edit_bounds.width -= PAD * 2;
 
         edit_bounds.y += ROW_H + PAD;
-        ui_textbox(edit_bounds, &customer.name);
+        ui_labelled_textbox(edit_bounds, "Name:", &customer.name);
 
         edit_bounds.y += ROW_H + PAD;
-        ui_textbox(edit_bounds, &customer.address_line1);
+        ui_labelled_textbox(edit_bounds, "Street Address:", &customer.address_line1);
 
         edit_bounds.y += ROW_H + PAD;
-        ui_textbox(edit_bounds, &customer.address_line2);
+        ui_labelled_textbox(edit_bounds, "PO Box/Apt/etc...:", &customer.address_line2);
 
         edit_bounds.y += ROW_H + PAD;
+        edit_bounds.width -= (ROW_H * 4 + PAD);
+
+        //TODO: autosave
         if(GuiButton(edit_bounds, " Save")) {
             db_customer_write(s, &customer);
             old_active_id = -1;
         }
+        edit_bounds.x += edit_bounds.width + PAD;
+        edit_bounds.width = ROW_H * 4;
+        static bool show_confirm_delete = false;
+        if(GuiButton(edit_bounds, " Delete")) {
+            show_confirm_delete = true;
+            old_active_id = -1;
+        }
+
+        if (show_confirm_delete) {
+            DrawRectangle(0, 0, GetScreenWidth(), GetScreenHeight(), Fade(RED, 0.8f));
+            int result = GuiMessageBox((Rectangle){ (float)GetScreenWidth()/2 - 125, (float)GetScreenHeight()/2 - 50, 250, 100 }, GuiIconText(ICON_WARNING, "Confirm Deletetion"), "Do you really want delete this customer?", "Yes;No");
+
+            if ((result == 0) || (result == 2)) {
+                show_confirm_delete = false;
+            } else if (result == 1) {
+                sqlite3_stmt * delete_stmt = db_prepare_and_bind(s, "delete from customers where id = ?;", "%d", id_mapping[active_id]);
+                sqlite3_step(delete_stmt);
+                sqlite3_finalize(delete_stmt);
+
+                active_id = -1;
+                show_confirm_delete = false;
+            }
+        }
     }
-        
 }

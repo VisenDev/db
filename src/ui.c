@@ -20,9 +20,24 @@ typedef struct {
 } ui_EditString;
 
 void ui_textbox(Rectangle bounds, ui_EditString * out) {
+    GuiSetStyle(DEFAULT, TEXT_ALIGNMENT, TEXT_ALIGN_LEFT);
     if (GuiTextBox(bounds, out->buf, EDIT_STRING_CAP, out->active)) {
         out->active = !out->active;
     }
+}
+
+void ui_labelled_textbox(Rectangle bounds, const char * label, ui_EditString * out) {
+    Rectangle label_bounds = bounds;
+    label_bounds.width = 150;
+    Rectangle textbox = bounds;
+    textbox.x += label_bounds.width;
+    textbox.width -= label_bounds.width;
+    
+    GuiSetStyle(DEFAULT, TEXT_ALIGNMENT, TEXT_ALIGN_CENTER);
+    GuiLabel(label_bounds, label);
+
+
+    ui_textbox(textbox, out);
 }
 
 typedef struct {
