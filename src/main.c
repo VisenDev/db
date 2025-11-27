@@ -121,7 +121,17 @@ void menu_home(db_State * s) {
 
 int main(void) {
     db_State * s;
+    static sql_Field fields[] = {
+        {.name = "id", .type = "integer primary key autoincrement", .sqlite_backing_type = SQLITE_INTEGER},
+        {.name = "address_line1", .type = "text", .sqlite_backing_type = SQLITE_TEXT},
+        {.name = "address_line2", .type = "text", .sqlite_backing_type = SQLITE_TEXT},
+        {.name = "city", .type = "text", .sqlite_backing_type = SQLITE_TEXT},
+        {.name = "street", .type = "text", .sqlite_backing_type = SQLITE_TEXT},
+    };
     db_application_init(&s);
+
+
+    puts(sql_table_insert(s, "customers", fields, CORE_ARRAY_LEN(fields)));
 
     while(!WindowShouldClose()) {
         db_application_begin_drawing(s);

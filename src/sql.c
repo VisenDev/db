@@ -85,3 +85,87 @@ void db_bind_editstring(db_State * s, sqlite3_stmt * stmt, int index, const ui_E
     if(SQLITE_OK != sqlite3_bind_text(stmt, index, in->buf, -1, SQLITE_TRANSIENT)) 
         DB_FATAL_SQL_ERROR(s, "");
 }
+
+
+
+
+
+//META
+
+typedef core_Vec(char) sql_Str;
+
+typedef struct {
+    int sqlite_backing_type_code;
+    union {
+        int integer;
+        sql_Str text;
+    } as;
+} sql_Value;
+
+
+typedef struct {
+    const char * name;
+    const char * type;
+    int sqlite_backing_type;
+    sql_Value value;
+} sql_Field;
+
+typedef core_Hashmap(sql_Value) sql_Values;
+
+const char * sql_table_create(db_State * s, const char * table_name, sql_Field * fields, size_t nfields) {
+    (void)s;
+    static char buf[10000];
+    size_t fill = 0;
+
+#   define add(str) core_strfmt(buf, sizeof(buf), &fill, str)
+
+    add("create table ");
+    add(table_name);
+    add(" (\n");
+    
+    size_t i;
+    for(i = 0; i < nfields; ++i) {
+        if(i != 0) {
+            add(",\n");
+        }
+        add("\t");
+        add(fields[i].name);
+        add(" ");
+        add(fields[i].type);
+    }
+    
+    add("\n);");
+
+#   undef add
+    return buf;
+}
+
+const char * sql_table_insert(db_State * s, const char * table_name, sql_Field * fields, size_t nfields) {
+    (void)s;
+    static char buf[10000];
+    size_t fill = 0;
+
+#   define add(str) core_strfmt(buf, sizeof(buf), &fill, str)
+
+    add("insert into ");
+    add(table_name);
+    size_t i;
+    add("(");
+    for(i = 0; i < nfields; ++i) {
+        if(i != 0) {
+            add(", ");
+        }
+        add(fields[i].name);
+    }
+    add(") values(");
+    for(i = 0; i < nfields; ++i) {
+        if(i != 0) {
+            add(", ");
+        }
+        add("?");
+    }
+    add(");");
+
+#   undef add
+    return buf;
+}
