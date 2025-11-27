@@ -31,8 +31,8 @@ typedef struct {
 } db_State;
 
 /*Local*/
-#include "sql.c"
 #include "ui.c"
+#include "sql.c"
 #include "customer.c"
 
 
@@ -55,7 +55,8 @@ void db_application_init(db_State ** out) {
         if(!db_exec_sql_file(s->db, "src/sql/db_init.sql")) CORE_FATAL_ERROR("Failed to init db");
     if(sqlite3_exec(s->db, "insert into customers(name) values('vintage');", NULL, NULL, NULL) != SQLITE_OK) CORE_FATAL_ERROR("fail");
 
-    SetConfigFlags(FLAG_WINDOW_RESIZABLE);
+    SetConfigFlags(FLAG_WINDOW_RESIZABLE /*| FLAG_VSYNC_HINT*/);
+    SetTargetFPS(170);
     InitWindow(1000, 750, "db");
     s->gui_style_active = 0;
 
@@ -64,6 +65,7 @@ void db_application_init(db_State ** out) {
 }
 
 void db_application_begin_drawing(db_State * s) {
+    if(IsWindowResized()) {}
     BeginDrawing();
     if (s->gui_style_active != s->gui_style_previous) {
         // Reset to default internal style
@@ -140,6 +142,11 @@ int main(void) {
         case DB_MENU_TAB_COUNT:
             CORE_UNREACHABLE;
         }
+
+        char fps_buf[1024];
+        sqlite3_snprintf(sizeof(fps_buf), fps_buf, "%d FPS", GetFPS());
+        GuiLabel((Rectangle){GetScreenWidth() - 55, GetScreenHeight() - 35, 50, 30}, fps_buf);
+
         db_application_end_drawing(s);
     }
 
