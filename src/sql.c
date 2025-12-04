@@ -107,12 +107,24 @@ typedef struct {
     const char * name;
     const char * type;
     int sqlite_backing_type;
-    sql_Value value;
-} sql_Field;
+} sql_FieldSchema;
 
+typedef struct {
+    const sql_FieldSchema * fields;
+    unsigned int nfields;
+    const char * name;
+} sql_TableSchema;
 typedef core_Hashmap(sql_Value) sql_Values;
 
-const char * sql_table_create(db_State * s, const char * table_name, sql_Field * fields, size_t nfields) {
+bool sql_tablescheme_has_field(sql_TableSchema tbl, const char * field_name) {
+    size_t i;
+    for(i = 0; i < tbl.nfields; ++i) {
+        if(strcmp(tbl.fields[i].name, field_name) == 0) return true;
+    }
+    return false;
+}
+
+bool sql_table_create(db_State * s, sql_TableSchema tbl) {
     (void)s;
     static char buf[10000];
     size_t fill = 0;
@@ -120,45 +132,50 @@ const char * sql_table_create(db_State * s, const char * table_name, sql_Field *
 #   define add(str) core_strfmt(buf, sizeof(buf), &fill, str)
 
     add("create table ");
-    add(table_name);
+    add(tbl.name);
     add(" (\n");
     
+
     size_t i;
-    for(i = 0; i < nfields; ++i) {
+    for(i = 0; i < tbl.nfields; ++i) {
         if(i != 0) {
             add(",\n");
         }
         add("\t");
-        add(fields[i].name);
+        add(tbl.fields[i].name);
         add(" ");
-        add(fields[i].type);
+        add(tbl.fields[i].type);
     }
     
     add("\n);");
 
 #   undef add
-    return buf;
+    if(sqlite3_exec(s->db, buf, NULL, NULL, NULL) != SQLITE_OK) return false;
+    return true;
 }
 
-const char * sql_table_insert(db_State * s, const char * table_name, sql_Field * fields, size_t nfields) {
+core_Bool sql_table_insert(db_State * s, sql_TableSchema tbl, sql_Values data) {
     (void)s;
     static char buf[10000];
     size_t fill = 0;
 
 #   define add(str) core_strfmt(buf, sizeof(buf), &fill, str)
 
+
     add("insert into ");
-    add(table_name);
+    add(tbl.name);
     size_t i;
     add("(");
-    for(i = 0; i < nfields; ++i) {
+    for(i = 0; i < tbl.nfields; ++i) {
         if(i != 0) {
             add(", ");
         }
-        add(fields[i].name);
+        add(tbl.fields[i].name);
     }
+
+    CORE_TODO("finish implementing this function to use the 'data' parameter");
     add(") values(");
-    for(i = 0; i < nfields; ++i) {
+    for(i = 0; i < tbl.nfields; ++i) {
         if(i != 0) {
             add(", ");
         }
@@ -167,5 +184,6 @@ const char * sql_table_insert(db_State * s, const char * table_name, sql_Field *
     add(");");
 
 #   undef add
-    return buf;
+    
+    return true;
 }
