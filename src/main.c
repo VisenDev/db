@@ -121,14 +121,29 @@ void menu_home(db_State * s) {
 
 int main(void) {
     db_State * s;
-//    static sql_Field fields[] = {
-//        {.name = "id", .type = "integer primary key autoincrement", .sqlite_backing_type = SQLITE_INTEGER},
-//        {.name = "address_line1", .type = "text", .sqlite_backing_type = SQLITE_TEXT},
-//        {.name = "address_line2", .type = "text", .sqlite_backing_type = SQLITE_TEXT},
-//        {.name = "city", .type = "text", .sqlite_backing_type = SQLITE_TEXT},
-//        {.name = "street", .type = "text", .sqlite_backing_type = SQLITE_TEXT},
-//    };
+
+    static sql_FieldSchema fields[] = {
+        {.name = "id", .type = "integer primary key autoincrement", .sqlite_backing_type = SQLITE_INTEGER},
+        {.name = "address_line1", .type = "text", .sqlite_backing_type = SQLITE_TEXT},
+        {.name = "address_line2", .type = "text", .sqlite_backing_type = SQLITE_TEXT},
+        {.name = "city", .type = "text", .sqlite_backing_type = SQLITE_TEXT},
+        {.name = "street", .type = "text", .sqlite_backing_type = SQLITE_TEXT},
+    };
+    static sql_TableSchema tbl = {
+        .fields = fields,
+        .nfields = CORE_ARRAY_LEN(fields),
+        .name = "customers"
+    };
+    sql_Values data = {0};
+    sql_Value id = {
+        .sqlite_backing_type = SQLITE_INTEGER,
+        .as.integer = 10
+    };
+    core_hashmap_set(&data, "id", strlen("id"), id);
+    sql_table_insert(NULL, tbl, data);
+
     db_application_init(&s);
+
 
     while(!WindowShouldClose()) {
         db_application_begin_drawing(s);

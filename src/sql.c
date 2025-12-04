@@ -95,7 +95,7 @@ void db_bind_editstring(db_State * s, sqlite3_stmt * stmt, int index, const ui_E
 typedef core_Vec(char) sql_Str;
 
 typedef struct {
-    int sqlite_backing_type_code;
+    int sqlite_backing_type;
     union {
         int integer;
         sql_Str text;
@@ -116,7 +116,7 @@ typedef struct {
 } sql_TableSchema;
 typedef core_Hashmap(sql_Value) sql_Values;
 
-bool sql_tablescheme_has_field(sql_TableSchema tbl, const char * field_name) {
+bool sql_tableschema_has_field(sql_TableSchema tbl, const char * field_name) {
     size_t i;
     for(i = 0; i < tbl.nfields; ++i) {
         if(strcmp(tbl.fields[i].name, field_name) == 0) return true;
@@ -173,17 +173,36 @@ core_Bool sql_table_insert(db_State * s, sql_TableSchema tbl, sql_Values data) {
         add(tbl.fields[i].name);
     }
 
-    CORE_TODO("finish implementing this function to use the 'data' parameter");
+//    CORE_TODO("finish implementing this function to use the 'data' parameter");
     add(") values(");
-    for(i = 0; i < tbl.nfields; ++i) {
-        if(i != 0) {
+
+    bool prepend_comma = false;
+    for(i = 0; i < data.backing.buckets.len; ++i) {
+        if(prepend_comma) {
             add(", ");
+        } else prepend_comma = true;
+
+        core_UntypedHashmapBucket bucket = data.backing.buckets.items[i];
+        size_t j;
+        for(j = 0; j < bucket.len; ++j) {
+            const char * key = bucket.items[i].key;
+            if(!sql_tableschema_has_field(tbl, key)) {
+                CORE_LOG("Attempted to insert non-existant field");
+                CORE_LOG(key);
+                CORE_LOG(buf);
+                return false;
+            }
+            add(":");
+            add(key);
         }
-        add("?");
+
+   
     }
     add(");");
 
 #   undef add
+    
+    printf(buf);
     
     return true;
 }

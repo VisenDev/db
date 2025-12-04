@@ -820,7 +820,7 @@ void core_untypedhashmap_free(core_UntypedHashmap * self)
 
 #define core_hashmap_set(self, key, keylen, value) do {                                              \
         (self)->temp = value;                                                                        \
-        core_untypedhashmap_set(&(self)->backing, key, keylen, &(self)->temp, sizeof((self)->temp)); \
+        core_untypedhashmap_set(&(self)->backing, key, (keylen) > 0 ? (keylen) : strlen(key), &(self)->temp, sizeof((self)->temp)); \
     } while (0)
 
 #define core_hashmap_get(self, key, keylen, result_ptr) (                                            \
