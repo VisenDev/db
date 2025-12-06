@@ -139,7 +139,7 @@ int main(void) {
         .sqlite_backing_type = SQLITE_INTEGER,
         .as.integer = 10
     };
-    core_hashmap_set(&data, "id", strlen("id"), id);
+    /* core_hashmap_set(&data, "id", strlen("id"), id); */
     sql_table_insert(NULL, tbl, data);
 
     db_application_init(&s);

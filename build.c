@@ -232,7 +232,7 @@ void run(void) {
 }
 
 void update_core_h(void) {
-    system(echo("wget https://github.com/VisenDev/core.h/raw/refs/heads/master/core.h --directory-prefix=src/3rdparty/core.h/"));
+    system(echo("trash src/3rdparty/core.h/core.h && wget https://github.com/VisenDev/core.h/raw/refs/heads/master/core.h --directory-prefix=src/3rdparty/core.h/"));
 }
 
 void tags(void) {

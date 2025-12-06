@@ -49,12 +49,9 @@ sqlite3_stmt * db_prepare_and_bind(db_State * s, const char * sql, const char * 
 core_Bool db_exec_sql_file(sqlite3 * db, const char * sql_file_path) {
     core_Arena arena = {0};
     char * exec_err = NULL;
-    FILE * fp = fopen(sql_file_path, "r");
     char * buf;
     core_Bool success = CORE_TRUE;
-    if(!fp) return CORE_FALSE;
-    buf = core_file_read_all_arena(&arena, fp);
-    fclose(fp);
+    buf = core_file_read_all_arena(&arena, sql_file_path);
     if(sqlite3_exec(db, buf, NULL, NULL, &exec_err) != SQLITE_OK) success = CORE_FALSE;
     //    printf("exec error: %s\n", exec_err);
     core_arena_free(&arena);
