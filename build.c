@@ -188,7 +188,7 @@ void build_main(void) {
     core_strfmt(cmd, sizeof(cmd), &fill, cc());
     core_strfmt(cmd, sizeof(cmd), &fill, " src/main.c ");
     //    core_strfmt(cmd, sizeof(cmd), &fill, "-Isrc/3rdparty/ ");
-    core_strfmt(cmd, sizeof(cmd), &fill, "-g -Wall -Wextra -Wpedantic -std=c99 " /* "-fsanitize=undefined " */);
+    core_strfmt(cmd, sizeof(cmd), &fill, "-g -Wall -Wextra -Wpedantic -std=c99 "  "-fsanitize=undefined " );
     core_strfmt(cmd, sizeof(cmd), &fill, SQLITE_OBJ);
     for(i = 0; i < CORE_ARRAY_LEN(raylib_obj); ++i) {
         core_strfmt(cmd, sizeof(cmd), &fill, " ");

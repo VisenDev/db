@@ -271,6 +271,20 @@ void * core_arena_alloc(core_Arena * a, const size_t bytes)
 ;
 #endif /*CORE_IMPLEMENTATION*/
 
+void core_arena_reclaim_memory(core_Arena * a, void * ptr) /*Equivalent to free(ptr)*/
+#ifdef CORE_IMPLEMENTATION
+{
+    core_Allocation * node = NULL;
+    assert(ptr != NULL);
+    for(node = a->head; node != NULL && node->mem != ptr; node = node->next);
+    assert(node != NULL);
+    assert(node->mem == ptr);
+    node->active = CORE_FALSE;
+}
+#else
+;
+#endif /*CORE_IMPLEMENTATION*/
+
 CORE_NODISCARD
 void * core_arena_realloc(core_Arena * a, void * ptr, const size_t bytes)
 #ifdef CORE_IMPLEMENTATION
@@ -296,7 +310,6 @@ void * core_arena_realloc(core_Arena * a, void * ptr, const size_t bytes)
 #endif /*CORE_IMPLEMENTATION*/
     
     
-
 void core_arena_free(core_Arena * a)
 #ifdef CORE_IMPLEMENTATION
 {
@@ -346,7 +359,13 @@ char * core_arena_strdup(core_Arena * arena, const char * str)
     (vec)->items[(vec)->len++] = item; \
 } while (0)
 
-/* #define core_vec_free(vec, arena) do { corefree(vec->items); vec->cap = 0; vec->len = 0;} while (0) */
+#define core_vec_copy_items(dst, src, arena) do { \
+    long i; \
+    for(i = 0; i < (src)->len; ++i) { \
+        core_vec_append(dst, arena, (src)->items[i]); \
+    } \
+} while(0)
+
 
 /**** CTYPE ****/
 core_Bool core_isidentifier(char ch)
@@ -670,213 +689,6 @@ unsigned long core_hash(const char * key, unsigned long modulus)
 #endif /*CORE_IMPLEMENTATION*/
 
 
-/**** UNTYPEDHASHMAP ****/
-
-typedef struct {
-    char * key;
-    size_t keylen;
-    void * value;
-    size_t value_byte_count;
-} core_UntypedHashmapEntry;
-
-typedef core_Vec(core_UntypedHashmapEntry) core_UntypedHashmapBucket;
-
-typedef core_Vec(core_UntypedHashmapBucket) core_UntypedHashmapBuckets;
-
-typedef struct {
-    core_Arena arena;
-    unsigned int num_entries;
-    core_UntypedHashmapBuckets buckets;
-    size_t i;
-    size_t j;
-} core_UntypedHashmap;
-
-#define CORE_UNTYPEDHASHMAP_REHASH_DENSITY_THRESHOLD 0.5f
-
-float core_untypedhashmap_density_calculate(core_UntypedHashmap * self)
-#ifdef CORE_IMPLEMENTATION
-{
-    if(self->buckets.len == 0) return 1.0;
-    return (float)self->num_entries / (float)self->buckets.len;
-}
-#else
-;
-#endif /*CORE_IMPLEMENTATION*/
-
-void core_untypedhashmap_init_capacity(unsigned long initial_capacity, core_UntypedHashmap * result)
-#ifdef CORE_IMPLEMENTATION
-{
-    unsigned long i = 0;
-    memset(result, 0, sizeof(core_UntypedHashmap));
-    for(i = 0; i < initial_capacity; ++i) {
-        core_UntypedHashmapBucket nullbucket = {0};
-        core_vec_append(&result->buckets, &result->arena, nullbucket);
-    }
-}
-#else
-;
-#endif /*CORE_IMPLEMENTATION*/
-
-void core_untypedhashmap_set(core_UntypedHashmap * self, const char * key, size_t keylen, void * value, size_t value_byte_count);
-
-void core_untypedhashmap_rehash(core_UntypedHashmap * self, unsigned long new_capacity)
-#ifdef CORE_IMPLEMENTATION
-{
-    unsigned long i = 0;
-    unsigned long j = 0;
-    core_UntypedHashmap temp = {0};
-    assert(new_capacity > self->buckets.len);
-    core_untypedhashmap_init_capacity(new_capacity, &temp);
-    for(i = 0; i < self->buckets.len; ++i) {
-        core_UntypedHashmapBucket bucket = self->buckets.items[i];
-        for(j = 0; j < bucket.len; ++j) {
-            core_UntypedHashmapEntry entry = bucket.items[j];
-            if(entry.key == NULL) continue;
-            core_untypedhashmap_set(&temp, entry.key, entry.keylen, entry.value, entry.value_byte_count);
-        }
-    }
-    core_arena_free(&self->arena);
-    *self = temp;
-}
-#else
-;
-#endif /*CORE_IMPLEMENTATION*/
-
-#ifdef CORE_IMPLEMENTATION
-core_UntypedHashmapBucket * core_untypedhashmap_bucket_find(core_UntypedHashmap * self, const char * key, size_t keylen) {
-    unsigned long hash = (unsigned long)-1;
-    (void)keylen;
-    if(core_untypedhashmap_density_calculate(self) > CORE_UNTYPEDHASHMAP_REHASH_DENSITY_THRESHOLD) {
-        core_untypedhashmap_rehash(self, (self->buckets.len + 1) * 2);
-    }
-    hash = core_hash(key, self->buckets.len);
-    return &self->buckets.items[hash];
-}
-#endif /*CORE_IMPLEMENTATION*/
-
-CORE_NODISCARD
-core_Bool core_untypedhashmap_get(core_UntypedHashmap * self, const char * key, size_t keylen, void * result, size_t result_byte_count)
-#ifdef CORE_IMPLEMENTATION
-{
-    core_UntypedHashmapBucket * bucket = core_untypedhashmap_bucket_find(self, key, keylen);
-    unsigned long i = 0;
-    for(i = 0; i < bucket->len; ++i) {
-        core_UntypedHashmapEntry * entry = &bucket->items[i];
-        if(core_streql(entry->key, key)) {
-            assert(entry->value_byte_count == result_byte_count);
-            memcpy(result, entry->value, result_byte_count);
-            return CORE_TRUE;
-        }
-    }
-
-    return CORE_FALSE;
-}
-#else
-;
-#endif /*CORE_IMPLEMENTATION*/
-
-void core_untypedhashmap_set(core_UntypedHashmap * self, const char * key, size_t keylen, void * value, size_t value_byte_count)
-#ifdef CORE_IMPLEMENTATION
-{
-    core_UntypedHashmapBucket * bucket = core_untypedhashmap_bucket_find(self, key, keylen);
-    unsigned long i = 0;
-    for(i = 0; i < bucket->len; ++i) {
-        core_UntypedHashmapEntry * entry = &bucket->items[i];
-        if(core_streql(entry->key, key)) {
-            assert(entry->value_byte_count == value_byte_count);
-            memcpy(entry->value, value, value_byte_count);
-            return;
-        }
-    }
-    /*no matching key found, append a new one*/
-    {
-        core_UntypedHashmapEntry entry = {0};
-        entry.key = core_strdup_via_arena(&self->arena, key, keylen);
-        entry.keylen = keylen;
-        entry.value = core_arena_alloc(&self->arena, value_byte_count);
-        memcpy(entry.value, value, value_byte_count);
-        entry.value_byte_count = value_byte_count;
-        core_vec_append(bucket, &self->arena, entry);
-        ++self->num_entries;
-    }
-}
-#else
-;
-#endif /*CORE_IMPLEMENTATION*/
-
-void core_untypedhashmap_free(core_UntypedHashmap * self)
-#ifdef CORE_IMPLEMENTATION
-{
-    core_arena_free(&self->arena);
-}
-#else
-;
-#endif /*CORE_IMPLEMENTATION*/
-
-void core_untypedhashmap_reset_next(core_UntypedHashmap * self)
-#ifdef CORE_IMPLEMENTATION
-{
-    self->i = 0;
-    self->j = 0;
-}
-#else
-;
-#endif /*CORE_IMPLEMENTATION*/
-
-core_Bool core_untypedhashmap_next(core_UntypedHashmap * self, void * dst, unsigned long dst_size, const char ** dst_key, unsigned long * dst_key_size)
-#ifdef CORE_IMPLEMENTATION
-{
-    core_UntypedHashmapBucket bkt;
-    core_UntypedHashmapEntry result;
-    
-    if(self->i >= self->buckets.len) return CORE_FALSE;
-    bkt = self->buckets.items[self->i];
-    if(self->j >= bkt.len) {
-        self->j = 0;
-        ++self->i;
-        return core_untypedhashmap_next(self, dst, dst_size, dst_key, dst_key_size);
-    }
-    result = bkt.items[self->j];
-    if(dst) {
-        assert(dst_size == result.value_byte_count);
-        memcpy(dst, result.value, result.value_byte_count);
-    }
-    if(dst_key) *dst_key = result.key;
-    if(dst_key_size) *dst_key_size = result.keylen;
-    ++self->j;
-    if(self->j >= bkt.len) {
-        self->j = 0;
-        ++self->i;
-    }
-    return CORE_TRUE;
-}
-#else
-;
-#endif /*CORE_IMPLEMENTATION*/
-
-
-#define core_Hashmap(Type) struct { core_UntypedHashmap backing; Type temp; Type * temp_ptr; }
-
-#define core_hashmap_nset(self, key, keylen, value) do {                                             \
-        (self)->temp = value;                                                                        \
-        core_untypedhashmap_set(&(self)->backing, key, keylen, &(self)->temp, sizeof((self)->temp)); \
-    } while (0)
-
-#define core_hashmap_set(self, key, value) core_hashmap_nset(self, key, strlen(key), value)
-
-#define core_hashmap_nget(self, key, keylen, result_ptr) (                                      \
-        (self)->temp_ptr = result_ptr, /*Typecheck result_ptr*/                                 \
-        core_untypedhashmap_get(&(self)->backing, key, keylen, result_ptr, sizeof(*result_ptr)) \
-    )
-#define core_hashmap_get(self, key, result_ptr) core_hashmap_nget(self, key, strlen(key), result_ptr)
-
-#define core_hashmap_free(self) core_untypedhashmap_free(&(self)->backing)
-
-#define core_hashmap_next(self, result_ptr, result_key_ptr, result_keylen_ptr) ((self)->temp_ptr = result_ptr, core_untypedhashmap_next(&(self)->backing, result_ptr, sizeof((self)->temp), result_key_ptr, result_keylen_ptr))
-
-#define core_hashmap_reset_next(self) core_untypedhashmap_reset_next(&(self)->backing)
-
-
 
 /**** STAT ****/
 typedef time_t core_Time;
@@ -949,7 +761,7 @@ void core_gensym(char * dst, size_t n)
             dst[i] = 'g';
         } else {
             if(num == 0) num = rand();
-            dst[i] = '0' + num % 10;
+            dst[i] = '0' + (char)(num % 10);
             num /= 10;
         }
     }
@@ -962,21 +774,19 @@ void core_gensym(char * dst, size_t n)
 
 
 /**** HASHMAP V2 ****/
-
-
-typedef struct core_HashmapV2Node {
-    struct core_HashmapV2Node * next;
+typedef struct core_HashmapNode {
+    struct core_HashmapNode * next;
     unsigned long index;
-} core_HashmapV2Node;
+} core_HashmapNode;
 
-typedef core_Vec(core_HashmapV2Node*) core_HashmapV2Buckets;
-typedef core_Vec(const char *) core_HashmapV2Keys;
+typedef core_Vec(core_HashmapNode*) core_HashmapBuckets;
+typedef core_Vec(const char *) core_HashmapKeys;
 
-core_Bool core_hashmapv2_get_index(core_HashmapV2Buckets * buckets, core_HashmapV2Keys * keys, unsigned long * result, const char * key)
+core_Bool core_hashmap_get_index(core_HashmapBuckets * buckets, core_HashmapKeys * keys, unsigned long * result, const char * key)
 #ifdef CORE_IMPLEMENTATION
 {
     unsigned long i;
-    core_HashmapV2Node * node;
+    core_HashmapNode * node;
 
     if(buckets->len <= 0) return CORE_FALSE;
 
@@ -998,64 +808,97 @@ core_Bool core_hashmapv2_get_index(core_HashmapV2Buckets * buckets, core_Hashmap
 ;
 #endif /*CORE_IMPLEMENTATION*/
 
-core_Bool core_hashmapv2_needs_resize(unsigned long num_keys, unsigned long num_buckets) 
+core_Bool core_hashmap_needs_resize(unsigned long num_keys, unsigned long num_buckets) 
 #ifdef CORE_IMPLEMENTATION
 {
-    return num_keys <= num_buckets * 3;
+    return num_keys >= num_buckets * 3;
 }
 #else
 ;
 #endif /*CORE_IMPLEMENTATION*/
 
-void core_hashmapv2_record_new_key(core_HashmapV2Buckets * buckets, core_Arena * arena, core_HashmapV2Keys * keys, const char * key)
+void core_hashmap_rehash(core_HashmapBuckets * buckets, core_Arena * arena, core_HashmapKeys * keys);
+
+void core_hashmap_record_new_key(core_HashmapBuckets * buckets, core_Arena * arena, core_HashmapKeys * keys, const char * key, unsigned long index)
 #ifdef CORE_IMPLEMENTATION
 {
     unsigned long i;
-    core_HashmapV2Node * new;
+    core_HashmapNode * new;
 
     if(buckets->cap == 0) {
         for(i = 0; i < 16; ++i) {
             core_vec_append(buckets, arena, NULL);
         }
-    } else if(core_hashmapv2_needs_resize(keys->len, buckets->len)) {
-        CORE_TODO("Figure out how to resize the buckets array");
+    } else if(core_hashmap_needs_resize(index, buckets->len)) {
+        core_hashmap_rehash(buckets, arena, keys);
     }
 
     i = core_hash(key, buckets->len);
 
     assert(i < buckets->len);
 
-    new = core_arena_alloc(arena, sizeof(core_HashmapV2Node));
+    new = core_arena_alloc(arena, sizeof(core_HashmapNode));
     assert(new);
-    memset(new, 0, sizeof(core_HashmapV2Node));
+    memset(new, 0, sizeof(core_HashmapNode));
 
     new->next = buckets->items[i];
-    new->index = keys->len;
+    new->index = index;
 
     buckets->items[i] = new;
-    core_vec_append(keys, arena, core_arena_strdup(arena, key));
 }
 #else
 ;
 #endif /*CORE_IMPLEMENTATION*/
 
-#define core_HashmapV2(T) struct { core_Vec(T) values; core_HashmapV2Keys keys; core_HashmapV2Buckets buckets; unsigned long index; }
+void core_hashmap_rehash(core_HashmapBuckets * buckets, core_Arena * arena, core_HashmapKeys * keys)
+#ifdef CORE_IMPLEMENTATION
+{
+    core_HashmapBuckets new = {0};
+    unsigned long i;
 
-#define core_hashmapv2_get(self, key)                                                        \
+    /*initialize new resized buckets array*/
+    for(i = 0; i < keys->len * 4; ++i) {
+        core_vec_append(&new, arena, NULL);
+    }
+    
+    /*copy keys into new buckets*/
+    for(i = 0; i < keys->len; ++i) {
+        core_hashmap_record_new_key(&new, arena, keys, keys->items[i], i);
+    }
+
+    /*free old buckets memory*/
+    for(i = 0; i < buckets->len; ++i) {
+        core_HashmapNode * node = buckets->items[i];
+        while(node) {
+            core_HashmapNode * next = node->next;
+            core_arena_reclaim_memory(arena, node);
+            node = next;
+        }
+    }
+    core_arena_reclaim_memory(arena, buckets->items);
+    
+    /*update buckets reference to use the newly resized array*/
+    *buckets = new;
+}
+#else
+;
+#endif /*CORE_IMPLEMENTATION*/
+
+#define core_Hashmap(T) struct { core_Vec(T) values; core_HashmapKeys keys; core_HashmapBuckets buckets; unsigned long index; }
+
+#define core_hashmap_get(self, key)                                                        \
     (                                                                                        \
-        core_hashmapv2_get_index(&(self)->buckets, &(self)->keys, &(self)->index, key)       \
+        core_hashmap_get_index(&(self)->buckets, &(self)->keys, &(self)->index, key)       \
         ? (&(self)->values.items[(self)->index]) : NULL                                      \
     )
 
-#define core_hashmapv2_set(self, arena, key, value) do {                            \
-    if(core_hashmapv2_get(self, key)) {                                             \
-        (self)->values.items[(self)->index] = value;                                \
-    } else {                                                                        \
-        core_hashmapv2_record_new_key(&(self)->buckets, arena, &(self)->keys, key); \
-        core_vec_append(&(self)->values, arena, value);                             \
-        assert((self)->values.len == (self)->keys.len);                             \
-    }                                                                               \
+#define core_hashmap_set(self, arena, key, value) do {                                              \
+    if(core_hashmap_get(self, key)) {                                                               \
+        (self)->values.items[(self)->index] = value;                                                  \
+    } else {                                                                                          \
+        core_hashmap_record_new_key(&(self)->buckets, arena, &(self)->keys, key, (self)->keys.len); \
+        core_vec_append(&(self)->values, arena, value);                                               \
+        core_vec_append(&(self)->keys, arena, core_arena_strdup(arena, key));                         \
+        assert((self)->values.len == (self)->keys.len);                                               \
+    }                                                                                                 \
 } while (0)
-
-
-

@@ -1,6 +1,6 @@
 /**** THIS FILE CONTAINS SQL UTILITIES ****/
 
-#define DB_FATAL_SQL_ERROR(state, sql_code) do {                            \
+#define SQL_FATAL_ERROR(state, sql_code) do {                            \
     if(sql_code != NULL) fprintf(stderr, "Offending sql code: \"%s\"\n", sql_code); \
     CORE_FATAL_ERROR(sqlite3_errmsg((state)->db));                          \
 } while(0)
@@ -14,7 +14,7 @@ sqlite3_stmt * db_prepare_and_bind(db_State * s, const char * sql, const char * 
     unsigned long i = 0;
     const unsigned long len = strlen(sql);
     if(sqlite3_prepare_v2(s->db, sql, len, &result, &unused_bytes) != SQLITE_OK) {
-        DB_FATAL_SQL_ERROR(s, sql);
+        SQL_FATAL_ERROR(s, sql);
     }
 
     core_Bool expect_fmt_char = false;
@@ -73,14 +73,14 @@ int db_count_rows(db_State * s, const char * table_name) {
     char sql[1024];
     sqlite3_snprintf(sizeof(sql), sql, "select count (*) from %s;", table_name);
     sqlite3_stmt * stmt = db_exec_sql_str(s, sql);
-    if(stmt == NULL) DB_FATAL_SQL_ERROR(s, sql);
+    if(stmt == NULL) SQL_FATAL_ERROR(s, sql);
     return sqlite3_column_int(stmt, 0);
 }
 
 
 void db_bind_editstring(db_State * s, sqlite3_stmt * stmt, int index, const ui_EditString * in) {
     if(SQLITE_OK != sqlite3_bind_text(stmt, index, in->buf, -1, SQLITE_TRANSIENT)) 
-        DB_FATAL_SQL_ERROR(s, "");
+        SQL_FATAL_ERROR(s, "");
 }
 
 
@@ -89,13 +89,11 @@ void db_bind_editstring(db_State * s, sqlite3_stmt * stmt, int index, const ui_E
 
 //META
 
-typedef core_Vec(char) sql_Str;
-
 typedef struct {
-    int sqlite_backing_type;
+    int tag; /*SQLITE BACKING TYPE TAG*/
     union {
         int integer;
-        sql_Str text;
+        const char * text;
     } as;
 } sql_Value;
 
@@ -155,51 +153,79 @@ core_Bool sql_table_insert(db_State * s, sql_TableSchema tbl, sql_Values data) {
     (void)s;
     static char buf[10000];
     size_t fill = 0;
+    bool prepend_comma = false;
+    size_t i;
+    sqlite3_stmt * stmt;
 
 #   define add(str) core_strfmt(buf, sizeof(buf), &fill, str)
 
-
     add("insert into ");
     add(tbl.name);
-    size_t i;
     add("(");
-    for(i = 0; i < tbl.nfields; ++i) {
-        if(i != 0) {
-            add(", ");
-        }
-        add(tbl.fields[i].name);
-    }
 
-//    CORE_TODO("finish implementing this function to use the 'data' parameter");
-    add(") values(");
-
-    bool prepend_comma = false;
-    for(i = 0; i < data.backing.buckets.len; ++i) {
+    prepend_comma = false;
+    for(i = 0; i < data.keys.len; ++i) {
         if(prepend_comma) {
             add(", ");
         } else prepend_comma = true;
+        const char * key = data.keys.items[i];
+        if(!sql_tableschema_has_field(tbl, key)) {
+            CORE_LOG("Attempted to insert non-existant field");
+            CORE_LOG(key);
+            CORE_LOG(buf);
+            return false;
+        }
+        add(key);
+    }
 
-        core_UntypedHashmapBucket bucket = data.backing.buckets.items[i];
-        size_t j;
-        for(j = 0; j < bucket.len; ++j) {
-            const char * key = bucket.items[i].key;
-            if(!sql_tableschema_has_field(tbl, key)) {
-                CORE_LOG("Attempted to insert non-existant field");
-                CORE_LOG(key);
-                CORE_LOG(buf);
-                return false;
-            }
+
+    add(") values(");
+
+    prepend_comma = false;
+    for(i = 0; i < data.keys.len; ++i) {
+        if(prepend_comma) {
+            add(", ");
+        } else prepend_comma = true;
+        {
+            const char * key = data.keys.items[i];
             add(":");
             add(key);
         }
-
-   
     }
+   
     add(");");
 
 #   undef add
     
-    printf(buf);
+    if(sqlite3_prepare_v2(s->db, buf, -1, &stmt, NULL) != SQLITE_OK) return false;
+    for(i = 0; i < data.keys.len; ++i) {
+        const char * key = data.keys.items[i];
+        const sql_Value val = data.values.items[i];
+        char buf[1024];
+        int index;
+        sqlite3_snprintf(sizeof(buf), buf, ":%s", key);
+        index = sqlite3_bind_parameter_index(stmt, buf);
+        if(index == 0) {
+            CORE_FATAL_ERROR("Failed to bind key");
+        }
+        switch(val.tag) {
+        case SQLITE_INTEGER:
+            printf("Bound %s to %d at index %d\n", key, val.as.integer, index);
+            sqlite3_bind_int(stmt, index, val.as.integer);
+            break;
+        case SQLITE_TEXT:
+            printf("Bound %s to %s at index %d\n", key, val.as.text, index);
+            sqlite3_bind_text(stmt, index, val.as.text, -1, SQLITE_TRANSIENT);
+            break;
+        default:
+            CORE_FATAL_ERROR("invalid tag");
+            break;
+        }
+    }
     
+    if(sqlite3_step(stmt) != SQLITE_DONE) {
+        SQL_FATAL_ERROR(s, buf);
+    }
+    sqlite3_finalize(stmt);
     return true;
 }

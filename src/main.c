@@ -124,6 +124,7 @@ int main(void) {
 
     static sql_FieldSchema fields[] = {
         {.name = "id", .type = "integer primary key autoincrement", .sqlite_backing_type = SQLITE_INTEGER},
+        {.name = "name", .type = "text", .sqlite_backing_type = SQLITE_TEXT},
         {.name = "address_line1", .type = "text", .sqlite_backing_type = SQLITE_TEXT},
         {.name = "address_line2", .type = "text", .sqlite_backing_type = SQLITE_TEXT},
         {.name = "city", .type = "text", .sqlite_backing_type = SQLITE_TEXT},
@@ -135,14 +136,10 @@ int main(void) {
         .name = "customers"
     };
     sql_Values data = {0};
-    sql_Value id = {
-        .sqlite_backing_type = SQLITE_INTEGER,
-        .as.integer = 10
-    };
-    /* core_hashmap_set(&data, "id", strlen("id"), id); */
-    sql_table_insert(NULL, tbl, data);
-
     db_application_init(&s);
+    core_hashmap_set(&data, s->arena, "id", ((sql_Value){.tag = SQLITE_INTEGER, .as.integer = 1000}));
+    core_hashmap_set(&data, s->arena, "name", ((sql_Value){.tag = SQLITE_TEXT, .as.text = "hashmap_test"}));
+    sql_table_insert(s, tbl, data);
 
 
     while(!WindowShouldClose()) {

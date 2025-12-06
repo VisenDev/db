@@ -130,10 +130,10 @@ void db_customer_read(db_State * s, int id, db_Customer * out) {
     const char * unused_bytes;
     if(stmt == NULL) {
         if(sqlite3_prepare_v2(s->db, sql, strlen(sql), &stmt, &unused_bytes) != SQLITE_OK)
-            DB_FATAL_SQL_ERROR(s, sql);
+            SQL_FATAL_ERROR(s, sql);
         core_on_exit(db_finalize_stmt, stmt);
     }
-    if(sqlite3_bind_int(stmt, 1, id) != SQLITE_OK) DB_FATAL_SQL_ERROR(s, sql);
+    if(sqlite3_bind_int(stmt, 1, id) != SQLITE_OK) SQL_FATAL_ERROR(s, sql);
     sqlite3_step(stmt);
 
 
@@ -185,7 +185,7 @@ void db_customer_write(db_State * s, const db_Customer * in) {
     const char * unused_bytes;
     if(stmt == NULL) {
         if(sqlite3_prepare_v2(s->db, sql, strlen(sql), &stmt, &unused_bytes) != SQLITE_OK)
-            DB_FATAL_SQL_ERROR(s, sql);
+            SQL_FATAL_ERROR(s, sql);
         core_on_exit(db_finalize_stmt, stmt);
     }
     int index = 1;
@@ -212,7 +212,7 @@ void db_customer_write(db_State * s, const db_Customer * in) {
 
     sqlite3_bind_int(stmt, index++, in->id);
 
-    if(sqlite3_step(stmt) != SQLITE_DONE) DB_FATAL_SQL_ERROR(s, sql);
+    if(sqlite3_step(stmt) != SQLITE_DONE) SQL_FATAL_ERROR(s, sql);
     sqlite3_reset(stmt);
 
     printf("Writing customer: ");
@@ -241,7 +241,7 @@ void menu_customers(db_State * s, int y) {
         id_mapping_len = num_customers;
     }
 
-    if(sqlite3_prepare_v2(s->db, sql, strlen(sql), &stmt, &unused_bytes) != SQLITE_OK) DB_FATAL_SQL_ERROR(s, sql);
+    if(sqlite3_prepare_v2(s->db, sql, strlen(sql), &stmt, &unused_bytes) != SQLITE_OK) SQL_FATAL_ERROR(s, sql);
 
     int i = 0;
     while(sqlite3_step(stmt) == SQLITE_ROW) {
