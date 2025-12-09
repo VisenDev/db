@@ -7,8 +7,8 @@ static const sql_FieldSchema schema_customers_fields[] = {
     {.name = "street", .type = "text", .sqlite_backing_type = SQLITE_TEXT},
 };
 static const sql_TableSchema schema_customers = {
-    .fields = fields,
-    .nfields = CORE_ARRAY_LEN(fields),
+    .fields = schema_customers_fields,
+    .nfields = CORE_ARRAY_LEN(schema_customers_fields),
     .name = "customers"
 };
 

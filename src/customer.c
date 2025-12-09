@@ -252,7 +252,7 @@ void menu_customers(db_State * s, int y) {
         id_mapping[i] = sqlite3_column_int(stmt, 0);
         if(id_mapping[i] == 0) CORE_FATAL_ERROR("Null id");
         static char num[1024];
-        sqlite3_snprintf(sizeof(num), num, " [%03d] ", id_mapping[i]);
+        sqlite3_snprintf(sizeof(num), num, " [%03d] ", sqlite3_column_int(stmt, 0));
         core_strfmt(buf, sizeof(buf), &fill, num);
         core_strfmt(buf, sizeof(buf), &fill, (char*)sqlite3_column_text(stmt, 1));
         ++i;

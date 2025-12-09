@@ -34,39 +34,34 @@ typedef struct {
 #include "ui.c"
 #include "sql.c"
 #include "customer.c"
+#include "schema.c"
 
 
-void db_application_init(db_State ** out) {
+db_State * db_application_init(void) {
     bool init_database = false;
+    const char * schema_path[] = {"schema.c"};
     const char * db_path = ".main.db";
-    db_State * s;
+    db_State * s = calloc(1, sizeof(*s));
+    assert(s);
 
-    *out = malloc(sizeof(db_State));
-    assert(*out != NULL);
-    s = *out;
-    memset(s, 0, sizeof(db_State));
+    s->arena = calloc(1, sizeof(s->arena));
 
-    s->arena = malloc(sizeof(core_Arena));
-    memset(s->arena, 0, sizeof(core_Arena));
+    init_database = core_file_needs_update(db_path, schema_path, CORE_ARRAY_LEN(schema_path));
+    if(init_database) {
+        unsigned long i;
+        for(i = 0; i < CORE_ARRAY_LEN(schemas); ++i) {
+            sql_table_create();
+        }
+    }
+        if(sqlite3_open(db_path, &s->db) != SQLITE_OK) {
+            CORE_FATAL_ERROR("failed to open db");
+        }
+    /* if(sqlite3_exec(s->db, "insert into customers(name) values('vintage');", NULL, NULL, NULL) != SQLITE_OK) CORE_FATAL_ERROR("fail"); */
 
-    if(!core_file_exists(db_path)) init_database = true;
-    if(sqlite3_open(db_path, &s->db) != SQLITE_OK) CORE_FATAL_ERROR("failed to open db");
-    if(init_database)
-        if(!db_exec_sql_file(s->db, "src/sql/db_init.sql")) CORE_FATAL_ERROR("Failed to init db");
-    if(sqlite3_exec(s->db, "insert into customers(name) values('vintage');", NULL, NULL, NULL) != SQLITE_OK) CORE_FATAL_ERROR("fail");
-
-    SetConfigFlags(FLAG_WINDOW_RESIZABLE /*| FLAG_VSYNC_HINT*/);
-    SetTargetFPS(170);
-    InitWindow(1000, 750, "db");
-    s->gui_style_active = 0;
-
-    SetWindowSize(GetScreenWidth(), GetScreenHeight() - 1);
-    SetWindowSize(GetScreenWidth(), GetScreenHeight() + 1);
 }
 
-void db_application_begin_drawing(db_State * s) {
-    if(IsWindowResized()) {}
-    BeginDrawing();
+
+void db_update_style(db_State * s) {
     if (s->gui_style_active != s->gui_style_previous) {
         // Reset to default internal style
         // NOTE: Required to unload any previously loaded font texture
@@ -88,21 +83,7 @@ void db_application_begin_drawing(db_State * s) {
         }
         s->gui_style_previous = s->gui_style_active;
     }
-    ClearBackground(GetColor(GuiGetStyle(DEFAULT, BACKGROUND_COLOR)));
-}
 
-void db_application_end_drawing(db_State * s) {
-    (void)s;
-    EndDrawing();
-}
-
-void db_application_deinit(db_State ** state) {
-    db_State * s = *state;
-    CloseWindow();
-    sqlite3_close(s->db);
-    core_arena_free(s->arena);
-    free(s);
-    *state = NULL;
 }
 
 void menu_home(db_State * s) {
@@ -120,17 +101,21 @@ void menu_home(db_State * s) {
 }
 
 int main(void) {
-    db_State * s;
+    db_State s = {0};
 
-    sql_Values data = {0};
-    db_application_init(&s);
-    core_hashmap_set(&data, s->arena, "id", ((sql_Value){.tag = SQLITE_INTEGER, .as.integer = 1000}));
-    core_hashmap_set(&data, s->arena, "name", ((sql_Value){.tag = SQLITE_TEXT, .as.text = "hashmap_test"}));
-    sql_table_insert(s, tbl, data);
+    SetConfigFlags(FLAG_WINDOW_RESIZABLE /*| FLAG_VSYNC_HINT*/);
+    SetTargetFPS(170);
+    InitWindow(1000, 750, "db");
+    s.gui_style_active = 0;
+
+    SetWindowSize(GetScreenWidth(), GetScreenHeight() - 1);
+    SetWindowSize(GetScreenWidth(), GetScreenHeight() + 1);
 
 
     while(!WindowShouldClose()) {
-        db_application_begin_drawing(s);
+        BeginDrawing();
+        db_update_style(&s);
+        ClearBackground(GetColor(GuiGetStyle(DEFAULT, BACKGROUND_COLOR)));
         
         GuiSetStyle(DEFAULT, TEXT_ALIGNMENT, TEXT_ALIGN_CENTER);
         GuiToggleGroup((Rectangle){0, 0, GetScreenWidth() / 3, ROW_H}, "Home;Customers;Open Orders", (int*)&s->menu_tab);
@@ -152,10 +137,14 @@ int main(void) {
         char fps_buf[1024];
         sqlite3_snprintf(sizeof(fps_buf), fps_buf, "%d FPS", GetFPS());
         GuiLabel((Rectangle){GetScreenWidth() - 55, GetScreenHeight() - 35, 50, 30}, fps_buf);
-
-        db_application_end_drawing(s);
+        
+        EndDrawing();
     }
 
-    db_application_deinit(&s);
+    CloseWindow();
+    sqlite3_close(s->db);
+    core_arena_free(s->arena);
+
+
     core_exit(0);
 }
