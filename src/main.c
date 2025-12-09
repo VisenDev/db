@@ -122,19 +122,6 @@ void menu_home(db_State * s) {
 int main(void) {
     db_State * s;
 
-    static sql_FieldSchema fields[] = {
-        {.name = "id", .type = "integer primary key autoincrement", .sqlite_backing_type = SQLITE_INTEGER},
-        {.name = "name", .type = "text", .sqlite_backing_type = SQLITE_TEXT},
-        {.name = "address_line1", .type = "text", .sqlite_backing_type = SQLITE_TEXT},
-        {.name = "address_line2", .type = "text", .sqlite_backing_type = SQLITE_TEXT},
-        {.name = "city", .type = "text", .sqlite_backing_type = SQLITE_TEXT},
-        {.name = "street", .type = "text", .sqlite_backing_type = SQLITE_TEXT},
-    };
-    static sql_TableSchema tbl = {
-        .fields = fields,
-        .nfields = CORE_ARRAY_LEN(fields),
-        .name = "customers"
-    };
     sql_Values data = {0};
     db_application_init(&s);
     core_hashmap_set(&data, s->arena, "id", ((sql_Value){.tag = SQLITE_INTEGER, .as.integer = 1000}));
