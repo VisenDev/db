@@ -23,8 +23,8 @@ typedef enum {
 } db_Status;
 
 typedef struct {
-    core_Arena * arena;
     sqlite3 * db;
+    core_Arena arena;
     db_MenuTab menu_tab;
     int gui_style_active;
     int gui_style_previous;
@@ -35,31 +35,6 @@ typedef struct {
 #include "sql.c"
 #include "customer.c"
 #include "schema.c"
-
-
-db_State * db_application_init(void) {
-    bool init_database = false;
-    const char * schema_path[] = {"schema.c"};
-    const char * db_path = ".main.db";
-    db_State * s = calloc(1, sizeof(*s));
-    assert(s);
-
-    s->arena = calloc(1, sizeof(s->arena));
-
-    init_database = core_file_needs_update(db_path, schema_path, CORE_ARRAY_LEN(schema_path));
-    if(init_database) {
-        unsigned long i;
-        for(i = 0; i < CORE_ARRAY_LEN(schemas); ++i) {
-            sql_table_create();
-        }
-    }
-        if(sqlite3_open(db_path, &s->db) != SQLITE_OK) {
-            CORE_FATAL_ERROR("failed to open db");
-        }
-    /* if(sqlite3_exec(s->db, "insert into customers(name) values('vintage');", NULL, NULL, NULL) != SQLITE_OK) CORE_FATAL_ERROR("fail"); */
-
-}
-
 
 void db_update_style(db_State * s) {
     if (s->gui_style_active != s->gui_style_previous) {
@@ -103,11 +78,20 @@ void menu_home(db_State * s) {
 int main(void) {
     db_State s = {0};
 
+    bool create_tables = core_file_exists(".main.db") ? false : true;
+    if(sqlite3_open(".main.db", &s.db) != SQLITE_OK) CORE_FATAL_ERROR("Failed to open db");
+    if(create_tables) {
+        unsigned long i;
+        for(i = 0; i < CORE_ARRAY_LEN(schemas); ++i) {
+            sql_table_create(&s, schemas[i]);
+        }
+    }
+
     SetConfigFlags(FLAG_WINDOW_RESIZABLE /*| FLAG_VSYNC_HINT*/);
     SetTargetFPS(170);
     InitWindow(1000, 750, "db");
-    s.gui_style_active = 0;
 
+    /*Fixes a minor bug on macos*/
     SetWindowSize(GetScreenWidth(), GetScreenHeight() - 1);
     SetWindowSize(GetScreenWidth(), GetScreenHeight() + 1);
 
@@ -118,20 +102,21 @@ int main(void) {
         ClearBackground(GetColor(GuiGetStyle(DEFAULT, BACKGROUND_COLOR)));
         
         GuiSetStyle(DEFAULT, TEXT_ALIGNMENT, TEXT_ALIGN_CENTER);
-        GuiToggleGroup((Rectangle){0, 0, GetScreenWidth() / 3, ROW_H}, "Home;Customers;Open Orders", (int*)&s->menu_tab);
+        GuiToggleGroup((Rectangle){0, 0, GetScreenWidth() / 3, ROW_H}, "Home;Customers;Open Orders", (int*)&s.menu_tab);
 
-        switch(s->menu_tab) {
+        switch(s.menu_tab) {
         case DB_MENU_TAB_HOME:
-            menu_home(s);
+            menu_home(&s);
             break;
         case DB_MENU_TAB_CUSTOMERS:
             //            ui_customer_display_row(s, (Rectangle){0, ROW_H + PAD, 512, ROW_H}, 1);
-            menu_customers(s, ROW_H);
+            menu_customers(&s, ROW_H);
             break;
         case DB_MENU_TAB_OPEN_ORDERS:
             break;
-        case DB_MENU_TAB_COUNT:
+        default:
             CORE_UNREACHABLE;
+            break;
         }
 
         char fps_buf[1024];
@@ -142,8 +127,8 @@ int main(void) {
     }
 
     CloseWindow();
-    sqlite3_close(s->db);
-    core_arena_free(s->arena);
+    sqlite3_close(s.db);
+    core_arena_free(&s.arena);
 
 
     core_exit(0);
