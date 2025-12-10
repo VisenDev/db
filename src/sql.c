@@ -78,10 +78,10 @@ int db_count_rows(db_State * s, const char * table_name) {
 }
 
 
-void db_bind_editstring(db_State * s, sqlite3_stmt * stmt, int index, const ui_EditString * in) {
-    if(SQLITE_OK != sqlite3_bind_text(stmt, index, in->buf, -1, SQLITE_TRANSIENT)) 
-        SQL_FATAL_ERROR(s, "");
-}
+/* void db_bind_editstring(db_State * s, sqlite3_stmt * stmt, int index, const ui_EditString * in) { */
+/*     if(SQLITE_OK != sqlite3_bind_text(stmt, index, in->buf, -1, SQLITE_TRANSIENT))  */
+/*         SQL_FATAL_ERROR(s, ""); */
+/* } */
 
 
 

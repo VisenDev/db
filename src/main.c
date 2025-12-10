@@ -3,8 +3,11 @@
 
 /* 3rdparty */
 #include "3rdparty/raylib/raylib.h"
-#define RAYGUI_IMPLEMENTATION
-#include "3rdparty/raygui/src/raygui.h"
+#define CLAY_IMPLEMENTATION
+#include "3rdparty/clay/clay.h"
+#include "3rdparty/clay/renderers/raylib/clay_renderer_raylib.c"
+/* #define RAYGUI_IMPLEMENTATION */
+/* #include "3rdparty/raygui/src/raygui.h" */
 #include "3rdparty/sqlite/sqlite3.h"
 #define  CORE_IMPLEMENTATION
 #include "3rdparty/core.h/core.h"
@@ -31,49 +34,57 @@ typedef struct {
 } db_State;
 
 /*Local*/
-#include "ui.c"
+/*#include "ui.c"*/
 #include "sql.c"
-#include "customer.c"
+/* #include "customer.c" */
 #include "schema.c"
 
-void db_update_style(db_State * s) {
-    if (s->gui_style_active != s->gui_style_previous) {
-        // Reset to default internal style
-        // NOTE: Required to unload any previously loaded font texture
-        GuiLoadStyleDefault();
+/* void db_update_style(db_State * s) { */
+/*     if (s->gui_style_active != s->gui_style_previous) { */
+/*         // Reset to default internal style */
+/*         // NOTE: Required to unload any previously loaded font texture */
+/*         GuiLoadStyleDefault(); */
 
-        switch (s->gui_style_active) {
-        case 1: GuiLoadStyleJungle(); break;
-        case 2: GuiLoadStyleCandy(); break;
-        case 3: GuiLoadStyleLavanda(); break;
-        case 4: GuiLoadStyleCyber(); break;
-        case 5: GuiLoadStyleTerminal(); break;
-        case 6: GuiLoadStyleAshes(); break;
-        case 7: GuiLoadStyleBluish(); break;
-        case 8: GuiLoadStyleDark(); break;
-        case 9: GuiLoadStyleCherry(); break;
-        case 10: GuiLoadStyleSunny(); break;
-        case 11: GuiLoadStyleEnefete(); break;
-        default: break;
-        }
-        s->gui_style_previous = s->gui_style_active;
-    }
+/*         switch (s->gui_style_active) { */
+/*         case 1: GuiLoadStyleJungle(); break; */
+/*         case 2: GuiLoadStyleCandy(); break; */
+/*         case 3: GuiLoadStyleLavanda(); break; */
+/*         case 4: GuiLoadStyleCyber(); break; */
+/*         case 5: GuiLoadStyleTerminal(); break; */
+/*         case 6: GuiLoadStyleAshes(); break; */
+/*         case 7: GuiLoadStyleBluish(); break; */
+/*         case 8: GuiLoadStyleDark(); break; */
+/*         case 9: GuiLoadStyleCherry(); break; */
+/*         case 10: GuiLoadStyleSunny(); break; */
+/*         case 11: GuiLoadStyleEnefete(); break; */
+/*         default: break; */
+/*         } */
+/*         s->gui_style_previous = s->gui_style_active; */
+/*     } */
 
+/* } */
+
+/* void menu_home(db_State * s) { */
+/*     const int width = 512; */
+/*     int x = PAD; */
+/*     int y = PAD + PAD + ROW_H; */
+/*     static ui_Address address = {0}; */
+/*     y = ui_address((Rectangle) {x, y, width, -1}, &address); */
+/*     if(GuiButton((Rectangle){ x, y, width, ROW_H }, "Save")) { */
+/*         printf("y: %d\n", y); */
+/*     } */
+/*     y += PAD + ROW_H; */
+
+/*     GuiComboBox((Rectangle){ x, y, width, ROW_H }, "default;Jungle;Candy;Lavanda;Cyber;Terminal;Ashes;Bluish;Dark;Cherry;Sunny;Enefete", &s->gui_style_active); */
+/* } */
+
+
+void HandleClayErrors(Clay_ErrorData errorData) {
+    printf("%s", errorData.errorText.chars);
 }
 
-void menu_home(db_State * s) {
-    const int width = 512;
-    int x = PAD;
-    int y = PAD + PAD + ROW_H;
-    static ui_Address address = {0};
-    y = ui_address((Rectangle) {x, y, width, -1}, &address);
-    if(GuiButton((Rectangle){ x, y, width, ROW_H }, "Save")) {
-        printf("y: %d\n", y);
-    }
-    y += PAD + ROW_H;
+#define FONT_ID_BODY_16 0
 
-    GuiComboBox((Rectangle){ x, y, width, ROW_H }, "default;Jungle;Candy;Lavanda;Cyber;Terminal;Ashes;Bluish;Dark;Cherry;Sunny;Enefete", &s->gui_style_active);
-}
 
 int main(void) {
     db_State s = {0};
@@ -87,30 +98,92 @@ int main(void) {
         }
     }
 
-    SetConfigFlags(FLAG_WINDOW_RESIZABLE /*| FLAG_VSYNC_HINT*/);
-    SetTargetFPS(170);
-    InitWindow(1000, 750, "db");
+    Clay_Raylib_Initialize(1024, 768, "db", FLAG_WINDOW_RESIZABLE | FLAG_WINDOW_HIGHDPI | FLAG_MSAA_4X_HINT | FLAG_VSYNC_HINT); // Extra parameters to this function are new since the video was published
+
+    uint64_t clayRequiredMemory = Clay_MinMemorySize();
+    Clay_Arena clayMemory = Clay_CreateArenaWithCapacityAndMemory(clayRequiredMemory, malloc(clayRequiredMemory));
+    Clay_Initialize(clayMemory, (Clay_Dimensions) {
+       .width = GetScreenWidth(),
+       .height = GetScreenHeight()
+        }, (Clay_ErrorHandler) { HandleClayErrors, NULL }); // This final argument is new since the video was published
+    Font fonts[1];
+    fonts[FONT_ID_BODY_16] = LoadFontEx("src/3rdparty/clay/examples/introducing-clay-video-demo/resources/Roboto-Regular.ttf", 48, 0, 400);
+    SetTextureFilter(fonts[FONT_ID_BODY_16].texture, TEXTURE_FILTER_BILINEAR);
+    Clay_SetMeasureTextFunction(Raylib_MeasureText, fonts);
+
+    
+
+    
+    /* SetConfigFlags(FLAG_WINDOW_RESIZABLE /\*| FLAG_VSYNC_HINT*\/); */
+    /* SetTargetFPS(170); */
+    /* InitWindow(1000, 750, "db"); */
 
     /*Fixes a minor bug on macos*/
     SetWindowSize(GetScreenWidth(), GetScreenHeight() - 1);
     SetWindowSize(GetScreenWidth(), GetScreenHeight() + 1);
 
+    Clay_Sizing layoutExpand = {
+        .width = CLAY_SIZING_GROW(0),
+        .height = CLAY_SIZING_GROW(0)
+    };
+
+    Clay_TextElementConfig * txtConfig = CLAY_TEXT_CONFIG({
+            .fontId = FONT_ID_BODY_16,
+            .textColor = {200, 200, 200, 255},
+            .fontSize = 32
+                        
+        });
+
 
     while(!WindowShouldClose()) {
-        BeginDrawing();
-        db_update_style(&s);
-        ClearBackground(GetColor(GuiGetStyle(DEFAULT, BACKGROUND_COLOR)));
+        Clay_BeginLayout();
+        Clay_SetLayoutDimensions((Clay_Dimensions) {
+                .width = GetScreenWidth(),
+                .height = GetScreenHeight()
+            });
+
+        Vector2 mousePosition = GetMousePosition();
+        Vector2 scrollDelta = GetMouseWheelMoveV();
+        Clay_SetPointerState(
+            (Clay_Vector2) { mousePosition.x, mousePosition.y },
+            IsMouseButtonDown(0)
+        );
+        Clay_UpdateScrollContainers(
+            true,
+            (Clay_Vector2) { scrollDelta.x, scrollDelta.y },
+            GetFrameTime()
+        );
+
+
+        CLAY(CLAY_ID("OuterContainer"), {
+                .backgroundColor = {43, 41, 51, 255 },
+                .layout = {
+                    .layoutDirection = CLAY_TOP_TO_BOTTOM,
+                    .sizing = layoutExpand,
+                    .padding = CLAY_PADDING_ALL(16),
+                    .childGap = 16
+                }
+            }) {
+            CLAY_TEXT(
+                CLAY_STRING("Hi"),
+            txtConfig);
+        }
+                        
         
-        GuiSetStyle(DEFAULT, TEXT_ALIGNMENT, TEXT_ALIGN_CENTER);
-        GuiToggleGroup((Rectangle){0, 0, GetScreenWidth() / 3, ROW_H}, "Home;Customers;Open Orders", (int*)&s.menu_tab);
+
+        /* db_update_style(&s); */
+        /* ClearBackground(GetColor(GuiGetStyle(DEFAULT, BACKGROUND_COLOR))); */
+        
+        /* GuiSetStyle(DEFAULT, TEXT_ALIGNMENT, TEXT_ALIGN_CENTER); */
+        /* GuiToggleGroup((Rectangle){0, 0, GetScreenWidth() / 3, ROW_H}, "Home;Customers;Open Orders", (int*)&s.menu_tab); */
 
         switch(s.menu_tab) {
         case DB_MENU_TAB_HOME:
-            menu_home(&s);
+            /* menu_home(&s); */
             break;
         case DB_MENU_TAB_CUSTOMERS:
             //            ui_customer_display_row(s, (Rectangle){0, ROW_H + PAD, 512, ROW_H}, 1);
-            menu_customers(&s, ROW_H);
+            /* menu_customers(&s, ROW_H); */
             break;
         case DB_MENU_TAB_OPEN_ORDERS:
             break;
@@ -119,10 +192,15 @@ int main(void) {
             break;
         }
 
-        char fps_buf[1024];
-        sqlite3_snprintf(sizeof(fps_buf), fps_buf, "%d FPS", GetFPS());
-        GuiLabel((Rectangle){GetScreenWidth() - 55, GetScreenHeight() - 35, 50, 30}, fps_buf);
-        
+        /* char fps_buf[1024]; */
+        /* sqlite3_snprintf(sizeof(fps_buf), fps_buf, "%d FPS", GetFPS()); */
+        /* GuiLabel((Rectangle){GetScreenWidth() - 55, GetScreenHeight() - 35, 50, 30}, fps_buf); */
+
+        Clay_RenderCommandArray renderCommands = Clay_EndLayout();
+            
+        BeginDrawing();
+        ClearBackground(BLACK);
+        Clay_Raylib_Render(renderCommands, fonts);
         EndDrawing();
     }
 
