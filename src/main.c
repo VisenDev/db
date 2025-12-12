@@ -39,46 +39,6 @@ typedef struct {
 /* #include "customer.c" */
 #include "schema.c"
 
-/* void db_update_style(db_State * s) { */
-/*     if (s->gui_style_active != s->gui_style_previous) { */
-/*         // Reset to default internal style */
-/*         // NOTE: Required to unload any previously loaded font texture */
-/*         GuiLoadStyleDefault(); */
-
-/*         switch (s->gui_style_active) { */
-/*         case 1: GuiLoadStyleJungle(); break; */
-/*         case 2: GuiLoadStyleCandy(); break; */
-/*         case 3: GuiLoadStyleLavanda(); break; */
-/*         case 4: GuiLoadStyleCyber(); break; */
-/*         case 5: GuiLoadStyleTerminal(); break; */
-/*         case 6: GuiLoadStyleAshes(); break; */
-/*         case 7: GuiLoadStyleBluish(); break; */
-/*         case 8: GuiLoadStyleDark(); break; */
-/*         case 9: GuiLoadStyleCherry(); break; */
-/*         case 10: GuiLoadStyleSunny(); break; */
-/*         case 11: GuiLoadStyleEnefete(); break; */
-/*         default: break; */
-/*         } */
-/*         s->gui_style_previous = s->gui_style_active; */
-/*     } */
-
-/* } */
-
-/* void menu_home(db_State * s) { */
-/*     const int width = 512; */
-/*     int x = PAD; */
-/*     int y = PAD + PAD + ROW_H; */
-/*     static ui_Address address = {0}; */
-/*     y = ui_address((Rectangle) {x, y, width, -1}, &address); */
-/*     if(GuiButton((Rectangle){ x, y, width, ROW_H }, "Save")) { */
-/*         printf("y: %d\n", y); */
-/*     } */
-/*     y += PAD + ROW_H; */
-
-/*     GuiComboBox((Rectangle){ x, y, width, ROW_H }, "default;Jungle;Candy;Lavanda;Cyber;Terminal;Ashes;Bluish;Dark;Cherry;Sunny;Enefete", &s->gui_style_active); */
-/* } */
-
-
 void HandleClayErrors(Clay_ErrorData errorData) {
     printf("%s", errorData.errorText.chars);
 }
@@ -111,13 +71,6 @@ int main(void) {
     SetTextureFilter(fonts[FONT_ID_BODY_16].texture, TEXTURE_FILTER_BILINEAR);
     Clay_SetMeasureTextFunction(Raylib_MeasureText, fonts);
 
-    
-
-    
-    /* SetConfigFlags(FLAG_WINDOW_RESIZABLE /\*| FLAG_VSYNC_HINT*\/); */
-    /* SetTargetFPS(170); */
-    /* InitWindow(1000, 750, "db"); */
-
     /*Fixes a minor bug on macos*/
     SetWindowSize(GetScreenWidth(), GetScreenHeight() - 1);
     SetWindowSize(GetScreenWidth(), GetScreenHeight() + 1);
@@ -130,17 +83,20 @@ int main(void) {
     Clay_TextElementConfig * txtConfig = CLAY_TEXT_CONFIG({
             .fontId = FONT_ID_BODY_16,
             .textColor = {200, 200, 200, 255},
-            .fontSize = 32
+            .fontSize = 16
                         
         });
 
 
+    bool database_loaded = false;
     while(!WindowShouldClose()) {
         Clay_BeginLayout();
-        Clay_SetLayoutDimensions((Clay_Dimensions) {
+        Clay_SetLayoutDimensions(
+            (Clay_Dimensions) {
                 .width = GetScreenWidth(),
                 .height = GetScreenHeight()
-            });
+            }
+        );
 
         Vector2 mousePosition = GetMousePosition();
         Vector2 scrollDelta = GetMouseWheelMoveV();
@@ -164,9 +120,24 @@ int main(void) {
                     .childGap = 16
                 }
             }) {
-            CLAY_TEXT(
-                CLAY_STRING("Hi"),
-            txtConfig);
+            static int count = 0;
+            if(true) {
+                CLAY(
+                    CLAY_ID("InitButton"), {
+                    .backgroundColor = Clay_Hovered() ?
+                    (Clay_Color){100, 50, 50, 40} : (Clay_Color){0}
+                    }
+                ) {
+                    if(Clay_PointerOver(CLAY_ID("InitButton"))) {
+                        CLAY_TEXT(CLAY_STRING("Hovered"), txtConfig);
+                    } else {
+                        CLAY_TEXT(CLAY_STRING("NotHovered"), txtConfig);
+                    }
+                }
+            }
+            char buf[1024];
+            snprintf(buf, sizeof(buf), "Count: %d", count++);
+            CLAY_TEXT(((Clay_String){.chars = buf, .length = strlen(buf), .isStaticallyAllocated = false}), txtConfig);
         }
                         
         
