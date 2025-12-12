@@ -75,12 +75,29 @@ void menu_home(db_State * s) {
     GuiComboBox((Rectangle){ x, y, width, ROW_H }, "default;Jungle;Candy;Lavanda;Cyber;Terminal;Ashes;Bluish;Dark;Cherry;Sunny;Enefete", &s->gui_style_active);
 }
 
+const char * db_get_datebase_path(db_State * s) {
+    (void)s;
+    return ".main.db";
+}
+
+void db_reset_database_file(db_State * s) {
+    if(s->db) {
+        sqlite3_close_v2(s->db);
+    }
+    remove(db_get_database_path);
+    unsigned long i;
+    for(i = 0; i < CORE_ARRAY_LEN(schemas); ++i) {
+        sql_table_create(&s, schemas[i]);
+    }
+}
+
 int main(void) {
     db_State s = {0};
 
-    bool create_tables = core_file_exists(".main.db") ? false : true;
+    /* bool create_tables = core_file_exists(".main.db") ? false : true; */
     if(sqlite3_open(".main.db", &s.db) != SQLITE_OK) CORE_FATAL_ERROR("Failed to open db");
     if(create_tables) {
+        system("trash .main.db");
         unsigned long i;
         for(i = 0; i < CORE_ARRAY_LEN(schemas); ++i) {
             sql_table_create(&s, schemas[i]);
