@@ -25,7 +25,6 @@ SOFTWARE.
 #ifndef _CORE_H_
 #define _CORE_H_
 
-#define _GNU_SOURCE
 #include <stdio.h>
 #include <stdlib.h>
 #include <assert.h>
@@ -1266,6 +1265,7 @@ void core_hashmap_rehash(core_HashmapBuckets * buckets, core_Arena * arena, core
 /**** TRASH ****/
 #ifdef CORE_LINUX
 
+char * realpath(const char *, char *);
 #   include <unistd.h>
 #   include <libgen.h>
 #   include <time.h>
