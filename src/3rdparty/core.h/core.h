@@ -25,6 +25,7 @@ SOFTWARE.
 #ifndef _CORE_H_
 #define _CORE_H_
 
+#define _GNU_SOURCE
 #include <stdio.h>
 #include <stdlib.h>
 #include <assert.h>
@@ -32,6 +33,7 @@ SOFTWARE.
 #include <string.h>
 #include <limits.h>
 #include <time.h>
+#include <stdarg.h>
 
 /****  C STANDARD ****/
 #ifdef __STDC_VERSION
@@ -50,10 +52,16 @@ SOFTWARE.
 
 
 /**** OPERATING SYSTEM ****/
-#if defined(__unix__) || defined(__linux__) || defined(__APPLE__)
-#    define CORE_UNIX
+#if defined(__linux__)
+#   define CORE_LINUX
+#endif
+#if defined(__APPLE__)
+#   define CORE_MACOS
+#endif
+#if defined(__unix__) || defined(CORE_MACOS) || defined(CORE_LINUX)
+#   define CORE_UNIX
 #elif defined(_WIN32) || defined(WIN32)
-#    define CORE_WINDOWS
+#   define CORE_WINDOWS
 #endif
 
 
@@ -68,6 +76,12 @@ SOFTWARE.
 #   define CORE_TCC
 #else
 #   pragma message "Unknown compiler"
+#endif
+
+
+/**** ATTRIBUTES ****/
+#if defined(CORE_CLANG) || defined(CORE_GCC) || defined(CORE_TCC)
+#   define CORE_ATTRIBUTES_AVAILABLE
 #endif
 
 
@@ -103,16 +117,68 @@ SOFTWARE.
 #define CORE_ANSI_RESET   "\x1b[0m"
 
 
-/**** MACROS ****/
-#define CORE_LOG(msg) do { \
-    fprintf(stderr, "%10s:%4d:0:   ", __FILE__, __LINE__);  \
-    fprintf(stderr, "%s\n", msg); \
-    fflush(stderr); \
+/**** LOGGING ****/
+#ifdef CORE_ATTRIBUTES_AVAILABLE
+__attribute__((format(printf, 1, 2)))
+#endif
+void core_errprint(const char * fmt, ...)
+#ifdef CORE_IMPLEMENTATION
+{
+    va_list args;
+    va_start(args, fmt);
+    vfprintf(stderr, fmt, args);
+    va_end(args);
+    fflush(stderr);
+}
+#else
+;
+#endif /*CORE_IMPLEMENTATION*/
+
+#define CORE_LOG_SRC() do { \
+    core_errprint("%s:%d:0:\n", __FILE__, __LINE__);  \
 } while (0)
 
+#define CORE_LOG(msg) do { \
+    core_errprint("%s:%d:0:\n", __FILE__, __LINE__);  \
+    core_errprint("    %s\n", msg); \
+} while (0)
+
+
+/**** GLIBC ****/
+#ifdef __GLIBC__
+#   define CORE_GLIBC
+#endif /*GLIBC*/
+
+
+/**** BACKTRACE ****/
+#ifdef CORE_GLIBC
+    #include <execinfo.h>
+    void core_print_backtrace(void)
+    #ifdef CORE_IMPLEMENTATION
+    {
+        void * buffer[128];
+        int size = backtrace(buffer, sizeof(buffer));
+        char ** syms = backtrace_symbols(buffer, size);
+        int i;
+        core_errprint("\nBACKTRACE:\n");
+        for(i = 0; i < size; ++i) {
+            core_errprint("    %s\n", syms[i]);
+        }
+        core_errprint("\n");
+        free(syms);
+    }
+    #else
+    ;
+    #endif /*CORE_IMPLEMENTATION*/
+#else
+#   define core_print_backtrace()
+#endif /*CORE_GLIBC*/
+
+
+/**** MACROS ****/
 #define CORE_UNREACHABLE do { CORE_LOG("unreachable code block reached!"); core_exit(1); } while (0)
+#define CORE_FATAL_ERROR(msg) do {CORE_LOG("ERROR"); CORE_LOG(msg); core_print_backtrace(); core_exit(1); } while (0)
 #define CORE_TODO(msg) do { CORE_LOG(CORE_ANSI_RESET "TODO:  "); CORE_LOG(msg); core_exit(1); } while (0)
-#define CORE_FATAL_ERROR(msg) do {CORE_LOG("ERROR"); CORE_LOG(msg); core_exit(1); } while (0)
 #define CORE_ARRAY_LEN(array) (sizeof(array) / sizeof(array[0]))
 
 
@@ -591,6 +657,298 @@ char * core_strdup_via_arena(core_Arena * arena, const char * str, size_t len)
 ;
 #endif /*CORE_IMPLEMENTATION*/
 
+
+/**** SNPRINTF ****/
+#define core_itoa core_stringify_long
+int core_stringify_long(char * dst, size_t dst_size, long num)
+#ifdef CORE_IMPLEMENTATION
+{
+    int i = 0;
+    int j,k;
+    core_Bool neg = num < 0;
+    if(dst_size < 2) return 0;
+    if(num == 0) {
+        dst[0] = '0';
+        dst[1] = 0;
+        return 1;
+    }
+    
+    if(neg) num = num * -1;
+    for(i = 0; i + 2 < (int)dst_size && num > 0; ++i, num /= 10) {
+        dst[i] = (char)(num % 10) + '0';
+    }
+
+    if(neg && i + 2 < (int)dst_size) {
+        dst[i++] = '-';
+    }
+    for(j = 0, k = i - 1; j < k; ++j, --k) {
+        char tmp = dst[j];
+        dst[j] = dst[k];
+        dst[k] = tmp;
+    }
+    dst[i] = 0;
+    return i;
+}
+#else
+;
+#endif /*CORE_IMPLEMENTATION*/
+
+core_Bool core_double_has_fractional_part(double num)
+#ifdef CORE_IMPLEMENTATION
+{
+    return num - (long)num > 0 || num - (long) num < 0;
+}
+#else
+;
+#endif
+
+
+int core_stringify_double(char * dst, size_t dst_size, int precision, double num)
+#ifdef CORE_IMPLEMENTATION
+{
+    long int_part = (long)num;
+    double fractional_part = num - (double)int_part;
+    int i = 0;
+    int digits = 0;
+    while(core_double_has_fractional_part(fractional_part) && digits < precision) {
+        fractional_part *= 10;
+        ++digits;
+    }
+    i = core_stringify_long(dst, dst_size, int_part);
+    if(i + 2 < (int)dst_size) {
+        dst[i] = '.';
+        ++i;
+    }
+    i = core_stringify_long(&dst[i], dst_size - (size_t)i, (long)fractional_part);
+    return i;
+}
+#else
+;
+#endif /*CORE_IMPLEMENTATION*/
+
+typedef struct {
+    /*flags*/
+    core_Bool flag_left_justify;
+    core_Bool flag_show_plus_on_positive_integers;
+    core_Bool flag_pad_if_no_sign;
+    core_Bool flag_hash;
+    core_Bool flag_pad_with_zeros;
+
+    /*width*/
+    core_Bool read_width_from_args;
+    int width;
+
+    /*precision*/
+    core_Bool read_precision_from_args;
+    int precision;
+
+    /*type length char*/
+    char length[3];
+
+    /*specifier char*/
+    char specifier;
+} core_SNPrintfParameters;
+
+/*Note: This implementation currently does not actually do anything with many of the parameters*/
+void core_snprintf_exec_parameters(char * dst, size_t n, size_t * dst_i, va_list args, core_SNPrintfParameters p) {
+    switch(p.specifier) {
+    case 's': {
+        const char * str = va_arg(args, const char *);
+        size_t len = strlen(str);
+        if(*dst_i + len + 2 > n) {
+            CORE_TODO("Handle the case where there is not enough room to print the string");
+        }
+        memcpy(&dst[*dst_i], str, len);
+        *dst_i += len;
+    } break;
+    case 'i':
+    case 'd': {
+        long num = 0;
+        if(p.length[0] == 'l') {
+            num = va_arg(args, long);
+        } else if(p.length[0] == 'h') {
+            num = va_arg(args, int);
+        } else {
+            num = va_arg(args, int);
+        }
+        *dst_i += (size_t)core_stringify_long(&dst[*dst_i], n - *dst_i, num);
+    } break;
+    default: CORE_TODO("Handle other format specifiers"); break;
+    }
+}
+
+enum {
+    core_snprintf_state_base,
+    core_snprintf_state_flags,
+    core_snprintf_state_width,
+    core_snprintf_state_precision,
+    core_snprintf_state_precision_maybe,
+    core_snprintf_state_length_1,
+    core_snprintf_state_length_2,
+    core_snprintf_state_specifier
+};
+
+
+#ifdef CORE_ATTRIBUTES_AVAILABLE
+__attribute__((format(printf, 3, 4)))
+#endif
+int core_snprintf(char * dst, size_t n, const char * fmt, ...)
+#ifdef CORE_IMPLEMENTATION
+{
+    size_t dst_i = 0;
+    size_t fmt_i = 0;
+    int core_snprintf_state = core_snprintf_state_base;
+
+    core_SNPrintfParameters params = {0};
+    va_list args;
+
+    va_start(args, fmt);
+    while(dst_i + 2 < n && fmt[fmt_i] != 0) {
+        switch(core_snprintf_state) {
+        case core_snprintf_state_base:
+            if(fmt[fmt_i] == '%') {
+                ++fmt_i;
+                core_snprintf_state = core_snprintf_state_flags;
+            } else {
+                dst[dst_i] = fmt[fmt_i];
+                ++dst_i;
+                ++fmt_i;
+            } 
+            break;
+        case core_snprintf_state_flags: {
+            core_Bool flag_encountered = CORE_TRUE;
+            switch(fmt[fmt_i]) {
+            case '-': params.flag_left_justify = CORE_TRUE; break;
+            case '+': params.flag_show_plus_on_positive_integers = CORE_TRUE; break;
+            case ' ': params.flag_pad_if_no_sign = CORE_TRUE; break;
+            case '#': params.flag_hash = CORE_TRUE; break;
+            case '0': params.flag_pad_with_zeros = CORE_TRUE; break;
+            default: flag_encountered = CORE_FALSE; break;
+            }
+            if(flag_encountered) {
+                ++fmt_i;
+            } else {
+                core_snprintf_state = core_snprintf_state_width;
+            }
+        } break;
+        case core_snprintf_state_width: {
+            if(fmt[fmt_i] == '*') {
+                params.read_width_from_args = CORE_TRUE;
+                ++fmt_i;
+                core_snprintf_state = core_snprintf_state_precision_maybe;
+            } else if(isdigit(fmt[fmt_i])) {
+                params.width *= 10;
+                params.width += fmt[fmt_i] - '0';
+                ++fmt_i;
+            } else {
+                core_snprintf_state = core_snprintf_state_precision_maybe;
+            }
+        } break;
+        case core_snprintf_state_precision_maybe: {
+            if(fmt[fmt_i] != '.') {
+                core_snprintf_state = core_snprintf_state_length_1;
+                params.precision = 6;
+            } else {
+                core_snprintf_state = core_snprintf_state_precision;
+                ++fmt_i;
+            }
+        } break;
+        case core_snprintf_state_precision: {
+            if(fmt[fmt_i] == '*') {
+                params.read_precision_from_args = CORE_TRUE;
+                ++fmt_i;
+                core_snprintf_state = core_snprintf_state_length_1;
+            } else if(isdigit(fmt[fmt_i])) {
+                params.precision *= 10;
+                params.precision += fmt[fmt_i] - '0';
+                ++fmt_i;
+            } else {
+                core_snprintf_state = core_snprintf_state_length_1;
+            }
+        } break;
+        case core_snprintf_state_length_1: {
+            char len = fmt[fmt_i];
+            switch(len) {
+            case 'l':
+            case 'h':
+                params.length[0] = len;
+                core_snprintf_state = core_snprintf_state_length_2;
+                ++fmt_i;
+                break;
+            case 'j':
+            case 'z':
+            case 't':
+            case 'L':
+                params.length[0] = len;
+                core_snprintf_state = core_snprintf_state_specifier;
+                ++fmt_i;
+                break;
+            default:
+                core_snprintf_state = core_snprintf_state_specifier;
+            }
+        } break;
+        case core_snprintf_state_length_2: {
+            char len = fmt[fmt_i];
+            switch(len) {
+            case 'l':
+            case 'h':
+                params.length[1] = len;
+                core_snprintf_state = core_snprintf_state_specifier;
+                ++fmt_i;
+                break;
+            default:
+                core_snprintf_state = core_snprintf_state_specifier;
+            }
+        } break;
+        case core_snprintf_state_specifier: {
+            switch(fmt[fmt_i]) {
+            case 'd':
+            case 'i':
+            case 'u':
+            case 'o':
+            case 'x':
+            case 'X':
+            case 'f':
+            case 'F':
+            case 'e':
+            case 'E':
+            case 'g':
+            case 'G':
+            case 'a':
+            case 'A':
+            case 'c':
+            case 's':
+            case 'p':
+            case 'n':
+            case '%':
+                params.specifier = fmt[fmt_i];
+                core_snprintf_exec_parameters(dst, n, &dst_i, args, params);
+
+                /*Reset parser info*/
+                memset(&params, 0, sizeof(params));
+                ++fmt_i;
+                core_snprintf_state = core_snprintf_state_base;
+                break;
+            default: {
+                fprintf(stderr, "Invalid specifier: %c\n", fmt[fmt_i]);
+                fprintf(stderr, "Length: %s\n", params.length);
+                CORE_UNREACHABLE; 
+            } break;
+            }
+        } break;
+        default: CORE_UNREACHABLE; break;
+        } 
+    }
+
+    /* cleanup: */
+    va_end(args);
+    dst[dst_i] = 0;
+    return (int)dst_i;
+}
+#else
+;
+#endif /*CORE_IMPLEMENTATION*/
+
 /*
   TODO: finish this function
 int core_string_search_replace(char * str, unsigned long strcap, const char * search, const char * replace)
@@ -743,7 +1101,7 @@ core_Bool core_file_exists(const char * path)
 #endif /*CORE_IMPLEMENTATION*/
 #endif /*CORE_UNIX*/
 
-#endif /*_CORE_H_*/
+
 
 
 /**** Gensym ****/
@@ -902,3 +1260,133 @@ void core_hashmap_rehash(core_HashmapBuckets * buckets, core_Arena * arena, core
         assert((self)->values.len == (self)->keys.len);                                               \
     }                                                                                                 \
 } while (0)
+
+
+
+/**** TRASH ****/
+#ifdef CORE_LINUX
+
+#   include <unistd.h>
+#   include <libgen.h>
+#   include <time.h>
+#   include <errno.h>
+#   include <linux/limits.h>
+
+#   ifdef CORE_IMPLEMENTATION
+    const char * _core_xdg_data_home(void) {
+        static char buf[1024];
+        unsigned long fill = 0;
+        const char * env = getenv("XDG_DATA_HOME");
+        if(env) {
+            return env;
+        } else {
+            core_strfmt(buf, sizeof(buf), &fill, getenv("HOME"));
+            core_strfmt(buf, sizeof(buf), &fill, "/.local/share");
+            return buf;
+        }
+    }
+    
+    const char * _core_trash_dir_path(void) {
+        static char buf[1024];
+        unsigned long fill = 0;
+        core_strfmt(buf, sizeof(buf), &fill, _core_xdg_data_home());
+        core_strfmt(buf, sizeof(buf), &fill, "/Trash");
+        return buf;
+    }
+
+    void _core_trash_dir_create(void) {
+        static char buf[1024];
+
+        assert(!core_file_exists(_core_trash_dir_path()));
+        mkdir(_core_trash_dir_path(), 0700);
+
+        core_snprintf(buf, sizeof(buf), "%s/files", _core_trash_dir_path());
+        mkdir(buf, 0700);
+        core_snprintf(buf, sizeof(buf), "%s/info", _core_trash_dir_path());
+        mkdir(buf, 0700);
+    }
+
+    core_Bool _core_trash_linux(const char * filename) {
+        static int count = 0;
+        static char outpath[1024];
+        static char infopath[1024];
+        static char filename_copy[1024];
+        char * _basename;
+
+        if(!filename) {
+            CORE_LOG("Cannot trash <NULL>");
+            return CORE_FALSE;
+        }
+        if(!core_file_exists(filename)) {
+            CORE_LOG_SRC();
+            core_errprint("    File '%s' cannot be trashed (file does not exist)\n\n", filename);
+            return CORE_FALSE;
+        }
+
+        core_snprintf(filename_copy, sizeof(filename_copy), "%s", filename);
+        _basename = basename(filename_copy);
+
+        ++count;
+
+        if(!core_file_exists(_core_trash_dir_path())) {
+            _core_trash_dir_create();
+        }
+
+        core_snprintf(outpath, sizeof(outpath), "%s/files/%d-%s", _core_trash_dir_path(), count, _basename);
+        if(core_file_exists(outpath)) return _core_trash_linux(filename);
+        
+        /*create the trashinfo file*/
+        core_snprintf(infopath, sizeof(infopath), "%s/info/%d-%s.trashinfo", _core_trash_dir_path(), count, _basename);
+        {
+            FILE * trashinfo = fopen(infopath, "w");
+            time_t now = time(NULL);
+            struct tm * tm_local;
+            char timestr[32];
+            /* printf("Trashinfo filename: %s\n", infopath); */
+
+            if(!trashinfo) {
+                CORE_LOG(strerror(errno));
+                return CORE_FALSE;
+            }
+
+            tm_local = localtime(&now);
+            strftime(timestr, sizeof(timestr), "%Y-%m-%dT%H:%M:%S", tm_local);
+            fprintf(trashinfo, "[Trash Info]\n");
+            {
+                char * _realpath = realpath(filename, NULL);
+                if(!_realpath) return CORE_FALSE;
+                fprintf(trashinfo, "Path=%s\n", _realpath);
+                free(_realpath);
+            }
+            fprintf(trashinfo, "DeletionDate=%s\n", timestr);
+            fclose(trashinfo);
+        }
+
+        /* printf("Trashing file %s, renaming to %s\n", filename, outpath); */
+        {
+            int code = rename(filename, outpath);
+            if(code != 0) {
+                CORE_LOG(strerror(errno));
+                return CORE_FALSE;
+            }
+        }
+        return CORE_TRUE;
+    }
+
+#   endif /*CORE_IMPLEMENTATION*/    
+#endif /*CORE_LINUX*/
+
+core_Bool core_trash(const char * filename)
+#ifdef CORE_IMPLEMENTATION
+{
+#   ifdef CORE_LINUX
+    return _core_trash_linux(filename);
+#   else
+    CORE_TODO("Implement core_trash for platforms other than linux");
+#   endif /*CORE_LINUX*/
+}
+#else
+;
+#endif /*CORE_IMPLEMENTATION*/
+
+#endif /*_CORE_H_*/

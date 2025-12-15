@@ -157,6 +157,20 @@ void libraylib(void) {
     }
 }
 
+void libwebui(void) {
+    unsigned long i;
+    char cmd[1024];
+    unsigned long fill = 0;
+    core_strfmt(cmd, sizeof(cmd), &fill, cc());
+    core_strfmt(cmd, sizeof(cmd), &fill, " -c src/3rdparty/webui/src/webui.c -o src/3rdparty/webui/src/webui.o");
+    if(system(echo(cmd)) != 0) CORE_FATAL_ERROR("Failed to build webui.o");
+    
+    fill = 0;
+    core_strfmt(cmd, sizeof(cmd), &fill, cc());
+    core_strfmt(cmd, sizeof(cmd), &fill, " -Isrc/3rdparty/webui/src/civetweb/ -DNO_SSL -DUSE_WEBSOCKET -c src/3rdparty/webui/src/civetweb/civetweb.c -o src/3rdparty/webui/src/civetweb/civetweb.o");
+    if(system(echo(cmd)) != 0) CORE_FATAL_ERROR("Failed to build webui.o");
+}
+
 void build_main(void) {
     char cmd[1024];
     unsigned long fill = 0;
@@ -183,17 +197,15 @@ void build_main(void) {
     /* } */
 
     sqlite_obj();
-    libraylib();
+    libwebui();
 
     core_strfmt(cmd, sizeof(cmd), &fill, cc());
     core_strfmt(cmd, sizeof(cmd), &fill, " src/main.c ");
     //    core_strfmt(cmd, sizeof(cmd), &fill, "-Isrc/3rdparty/ ");
     core_strfmt(cmd, sizeof(cmd), &fill, "-g -Wall -Wextra -Wpedantic -std=c99 "  "-fsanitize=undefined " );
     core_strfmt(cmd, sizeof(cmd), &fill, SQLITE_OBJ);
-    for(i = 0; i < CORE_ARRAY_LEN(raylib_obj); ++i) {
-        core_strfmt(cmd, sizeof(cmd), &fill, " ");
-        core_strfmt(cmd, sizeof(cmd), &fill, raylib_obj[i]);
-    }
+    core_strfmt(cmd, sizeof(cmd), &fill, " src/3rdparty/webui/src/webui.o ");
+    core_strfmt(cmd, sizeof(cmd), &fill, " src/3rdparty/webui/src/civetweb/civetweb.o ");
     core_strfmt(cmd, sizeof(cmd), &fill, " -o ");
     core_strfmt(cmd, sizeof(cmd), &fill, out());
     core_strfmt(cmd, sizeof(cmd), &fill, " -lm ");
