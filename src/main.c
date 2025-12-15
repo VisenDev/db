@@ -33,7 +33,7 @@ typedef struct {
 /*Local*/
 #include "ui.c"
 #include "sql.c"
-#include "customer.c"
+/* #include "customer.c" */
 #include "schema.c"
 
 void db_update_style(db_State * s) {
@@ -75,34 +75,34 @@ void menu_home(db_State * s) {
     GuiComboBox((Rectangle){ x, y, width, ROW_H }, "default;Jungle;Candy;Lavanda;Cyber;Terminal;Ashes;Bluish;Dark;Cherry;Sunny;Enefete", &s->gui_style_active);
 }
 
-const char * db_get_datebase_path(db_State * s) {
+const char * db_get_database_path(db_State * s) {
     (void)s;
     return ".main.db";
 }
 
 void db_reset_database_file(db_State * s) {
-    if(s->db) {
+    bool loaded = s->db;
+    if(loaded) {
         sqlite3_close_v2(s->db);
     }
-    remove(db_get_database_path);
+    remove(db_get_database_path(s));
+    if(sqlite3_open(db_get_database_path(s), &s->db) != SQLITE_OK) 
+        CORE_FATAL_ERROR("Failed to open db");
     unsigned long i;
     for(i = 0; i < CORE_ARRAY_LEN(schemas); ++i) {
-        sql_table_create(&s, schemas[i]);
+        sql_table_create(s, schemas[i]);
     }
+    if(!loaded)
+        sqlite3_close_v2(s->db);
+
 }
 
 int main(void) {
     db_State s = {0};
 
     /* bool create_tables = core_file_exists(".main.db") ? false : true; */
-    if(sqlite3_open(".main.db", &s.db) != SQLITE_OK) CORE_FATAL_ERROR("Failed to open db");
-    if(create_tables) {
-        system("trash .main.db");
-        unsigned long i;
-        for(i = 0; i < CORE_ARRAY_LEN(schemas); ++i) {
-            sql_table_create(&s, schemas[i]);
-        }
-    }
+    db_reset_database_file(&s);
+    if(sqlite3_open(db_get_database_path(&s), &s.db) != SQLITE_OK) CORE_FATAL_ERROR("Failed to open db");
 
     SetConfigFlags(FLAG_WINDOW_RESIZABLE /*| FLAG_VSYNC_HINT*/);
     SetTargetFPS(170);
@@ -127,7 +127,7 @@ int main(void) {
             break;
         case DB_MENU_TAB_CUSTOMERS:
             //            ui_customer_display_row(s, (Rectangle){0, ROW_H + PAD, 512, ROW_H}, 1);
-            menu_customers(&s, ROW_H);
+            /* menu_customers(&s, ROW_H); */
             break;
         case DB_MENU_TAB_OPEN_ORDERS:
             break;
