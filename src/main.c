@@ -45,6 +45,13 @@ void HandleClayErrors(Clay_ErrorData errorData) {
 
 #define FONT_ID_BODY_16 0
 
+const Clay_Color COLOR_LIGHT = (Clay_Color) {244, 235, 230, 255};
+const Clay_Color COLOR_LIGHT_HOVER = (Clay_Color) {224, 215, 210, 255};
+const Clay_Color COLOR_RED = (Clay_Color) {168, 66, 28, 255};
+const Clay_Color COLOR_RED_HOVER = (Clay_Color) {148, 46, 8, 255};
+const Clay_Color COLOR_ORANGE = (Clay_Color) {225, 138, 50, 255};
+const Clay_Color COLOR_BLUE = (Clay_Color) {111, 173, 162, 255};
+Clay_TextElementConfig headerTextConfig = (Clay_TextElementConfig) { .fontId = 2, .fontSize = 24, .textColor = {61, 26, 5, 255} };
 
 int main(void) {
     db_State s = {0};
@@ -63,17 +70,16 @@ int main(void) {
     uint64_t clayRequiredMemory = Clay_MinMemorySize();
     Clay_Arena clayMemory = Clay_CreateArenaWithCapacityAndMemory(clayRequiredMemory, malloc(clayRequiredMemory));
     Clay_Initialize(clayMemory, (Clay_Dimensions) {
-       .width = GetScreenWidth(),
-       .height = GetScreenHeight()
+            .width = GetScreenWidth(),
+            .height = GetScreenHeight()
         }, (Clay_ErrorHandler) { HandleClayErrors, NULL }); // This final argument is new since the video was published
     Font fonts[1];
-    fonts[FONT_ID_BODY_16] = LoadFontEx("src/3rdparty/clay/examples/introducing-clay-video-demo/resources/Roboto-Regular.ttf", 48, 0, 400);
+    fonts[0] = GetFontDefault();
+    /* fonts[FONT_ID_BODY_16] = LoadFontEx("src/3rdparty/clay/examples/introducing-clay-video-demo/resources/Roboto-Regular.ttf", 16, 0, 400); */
     SetTextureFilter(fonts[FONT_ID_BODY_16].texture, TEXTURE_FILTER_BILINEAR);
     Clay_SetMeasureTextFunction(Raylib_MeasureText, fonts);
 
     /*Fixes a minor bug on macos*/
-    SetWindowSize(GetScreenWidth(), GetScreenHeight() - 1);
-    SetWindowSize(GetScreenWidth(), GetScreenHeight() + 1);
 
     Clay_Sizing layoutExpand = {
         .width = CLAY_SIZING_GROW(0),
@@ -83,21 +89,16 @@ int main(void) {
     Clay_TextElementConfig * txtConfig = CLAY_TEXT_CONFIG({
             .fontId = FONT_ID_BODY_16,
             .textColor = {200, 200, 200, 255},
-            .fontSize = 16
+            .fontSize = 17
                         
         });
+
+    SetWindowSize(GetScreenWidth(), GetScreenHeight() - 10);
+    SetWindowSize(GetScreenWidth(), GetScreenHeight() + 10);
 
 
     bool database_loaded = false;
     while(!WindowShouldClose()) {
-        Clay_BeginLayout();
-        Clay_SetLayoutDimensions(
-            (Clay_Dimensions) {
-                .width = GetScreenWidth(),
-                .height = GetScreenHeight()
-            }
-        );
-
         Vector2 mousePosition = GetMousePosition();
         Vector2 scrollDelta = GetMouseWheelMoveV();
         Clay_SetPointerState(
@@ -110,6 +111,13 @@ int main(void) {
             GetFrameTime()
         );
 
+        Clay_BeginLayout();
+        Clay_SetLayoutDimensions(
+            (Clay_Dimensions) {
+                .width = GetScreenWidth(),
+                .height = GetScreenHeight()
+            }
+        );
 
         CLAY(CLAY_ID("OuterContainer"), {
                 .backgroundColor = {43, 41, 51, 255 },
@@ -124,15 +132,10 @@ int main(void) {
             if(true) {
                 CLAY(
                     CLAY_ID("InitButton"), {
-                    .backgroundColor = Clay_Hovered() ?
-                    (Clay_Color){100, 50, 50, 40} : (Clay_Color){0}
+                        .backgroundColor = (Clay_Color){100, 50, 50, 40},
                     }
                 ) {
-                    if(Clay_PointerOver(CLAY_ID("InitButton"))) {
-                        CLAY_TEXT(CLAY_STRING("Hovered"), txtConfig);
-                    } else {
-                        CLAY_TEXT(CLAY_STRING("NotHovered"), txtConfig);
-                    }
+                    CLAY_TEXT(Clay_Hovered() ? CLAY_STRING("Hovered") : CLAY_STRING("NotHovered"), txtConfig);
                 }
             }
             char buf[1024];
